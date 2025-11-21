@@ -6,6 +6,9 @@ declare namespace Cloudflare {
 		mainModule: typeof import("./src/index");
 	}
 	interface Env {
+		ADMIN_EMAILS?: string;
+		GOOGLE_PLACES_API_KEY?: string;
+		DB?: D1Database;
 	}
 }
 interface Env extends Cloudflare.Env {}
