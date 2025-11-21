@@ -36,7 +36,7 @@ export function handleHome(c: Context<{ Bindings: Env }>) {
 			}
 			.hero p {
 				font-size: 1.25rem;
-				color: #666;
+				color: var(--wa-color-text-quiet);
 				margin-bottom: 2rem;
 			}
 			.features {

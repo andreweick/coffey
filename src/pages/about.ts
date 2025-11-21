@@ -66,7 +66,7 @@ export function handleAbout(c: Context<{ Bindings: Env }>) {
 			}
 			.about-hero .lead {
 				font-size: 1.25rem;
-				color: #666;
+				color: var(--wa-color-text-quiet);
 			}
 			.about-content {
 				display: grid;

@@ -61,7 +61,7 @@ export function renderBlogPost(post: Post): string {
 				margin: 0 auto;
 			}
 			.post-meta {
-				color: #666;
+				color: var(--wa-color-text-quiet);
 				margin-bottom: 2rem;
 			}
 			.post-meta time {

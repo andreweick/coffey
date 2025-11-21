@@ -15,8 +15,8 @@ export function renderNav(): string {
 		</nav>
 		<style>
 			.site-nav {
-				background: var(--wa-color-primary, #3b82f6);
-				color: white;
+				background: var(--wa-color-brand-fill-normal);
+				color: var(--wa-color-brand-on-normal);
 				padding: 0.75rem 1rem;
 			}
 			.nav-container {
@@ -30,7 +30,7 @@ export function renderNav(): string {
 				display: flex;
 				align-items: center;
 				gap: 0.5rem;
-				color: white;
+				color: var(--wa-color-brand-on-normal);
 				text-decoration: none;
 				font-weight: bold;
 				font-size: 1.25rem;
@@ -40,7 +40,7 @@ export function renderNav(): string {
 				gap: 1.5rem;
 			}
 			.nav-links a {
-				color: white;
+				color: var(--wa-color-brand-on-normal);
 				text-decoration: none;
 				opacity: 0.9;
 			}
@@ -66,7 +66,7 @@ export function renderFooter(): string {
 		</div>
 		<style>
 			.site-footer {
-				background: #f3f4f6;
+				background: var(--wa-color-surface-lowered);
 				padding: 1.5rem 1rem;
 				margin-top: 2rem;
 			}
@@ -81,14 +81,14 @@ export function renderFooter(): string {
 			}
 			.footer-container p {
 				margin: 0;
-				color: #666;
+				color: var(--wa-color-text-quiet);
 			}
 			.footer-links {
 				display: flex;
 				gap: 1.5rem;
 			}
 			.footer-links a {
-				color: #666;
+				color: var(--wa-color-text-quiet);
 				text-decoration: none;
 			}
 			.footer-links a:hover {
