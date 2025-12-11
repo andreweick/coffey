@@ -1,22 +1,20 @@
 import type { NearbyPlace } from "../types/domain";
 
 interface GooglePlaceResult {
-	place_id: string;
-	name: string;
-	vicinity?: string;
-	geometry: {
-		location: {
-			lat: number;
-			lng: number;
-		};
+	id: string;
+	displayName?: {
+		text: string;
+	};
+	formattedAddress?: string;
+	location?: {
+		latitude: number;
+		longitude: number;
 	};
 	types?: string[];
 }
 
 interface GooglePlacesResponse {
-	results: GooglePlaceResult[];
-	status: string;
-	error_message?: string;
+	places: GooglePlaceResult[];
 }
 
 export interface FetchNearbyPlacesParams {
@@ -31,34 +29,58 @@ export async function fetchNearbyPlaces(
 	params: FetchNearbyPlacesParams
 ): Promise<NearbyPlace[]> {
 	const { lat, lng, query, radius = 1500 } = params;
-	const apiKey = env.GOOGLE_PLACES_API_KEY;
+	const apiKey = await env.GOOGLE_PLACES_API.get();
 
 	if (!apiKey) {
-		throw new Error("GOOGLE_PLACES_API_KEY is not configured");
+		throw new Error("GOOGLE_PLACES_API is not configured");
 	}
 
-	const url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
-	url.searchParams.set("location", `${lat},${lng}`);
-	url.searchParams.set("radius", String(radius));
-	url.searchParams.set("key", apiKey);
+	const url = "https://places.googleapis.com/v1/places:searchNearby";
 
+	const requestBody: any = {
+		locationRestriction: {
+			circle: {
+				center: {
+					latitude: lat,
+					longitude: lng,
+				},
+				radius: radius,
+			},
+		},
+	};
+
+	// If query is provided, use it as a text query
 	if (query) {
-		url.searchParams.set("keyword", query);
+		requestBody.textQuery = query;
 	}
 
-	const response = await fetch(url.toString());
+	const response = await fetch(url, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			"X-Goog-Api-Key": apiKey,
+			"X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types",
+		},
+		body: JSON.stringify(requestBody),
+	});
+
+	if (!response.ok) {
+		const errorText = await response.text();
+		throw new Error(`Google Places API error: ${response.status} - ${errorText}`);
+	}
+
 	const data = (await response.json()) as GooglePlacesResponse;
 
-	if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-		throw new Error(`Google Places API error: ${data.status} - ${data.error_message ?? "Unknown error"}`);
+	if (!data.places) {
+		return [];
 	}
 
-	return data.results.map((place) => ({
-		placeId: place.place_id,
-		name: place.name,
-		address: place.vicinity,
-		lat: place.geometry.location.lat,
-		lng: place.geometry.location.lng,
+	return data.places.map((place) => ({
+		placeId: place.id,
+		name: place.displayName?.text || "Unknown",
+		address: place.formattedAddress,
+		lat: place.location?.latitude || 0,
+		lng: place.location?.longitude || 0,
 		types: place.types,
 	}));
 }

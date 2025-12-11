@@ -20,34 +20,17 @@ export function renderPage(options: PageOptions): string {
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>${escapeHtml(title)}</title>
 	${metaDescription}
 	<link rel="manifest" href="/manifest.json">
-	<meta name="theme-color" content="#3b82f6">
-	<!-- TODO: Replace with your Web Awesome Pro project code -->
-	<script type="module" src="https://cdn.webawesome.com/d1309049507a45d3/webawesome.loader.js"></script>
-	<style>
-	html,
-	body {
-    min-height: 100%;
-    height: 100%;
-    padding: 0;
-    margin: 0;
-  }
-		.container {
-			max-width: 1200px;
-			margin: 0 auto;
-			padding: 1rem;
-		}
-	</style>
+	<script src="https://kit.webawesome.com/d1309049507a45d3.js" crossorigin="anonymous"></script>
 </head>
 <body>
 	<wa-page mobile-breakpoint="768">
 		<header slot="header">
 			${nav}
 		</header>
-		<main slot="main" class="container">
+		<main>
 			${body}
 		</main>
 		<footer slot="footer">

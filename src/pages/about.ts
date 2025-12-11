@@ -3,12 +3,12 @@ import { renderPage } from "../ui/layout";
 
 export function handleAbout(c: Context<{ Bindings: Env }>) {
 	const body = `
-		<section class="about-hero">
-			<h1>About Coffey</h1>
-			<p class="lead">Building the future of content, one post at a time.</p>
+		<section class="wa-stack wa-align-items-center wa-gap-m" style="text-align: center; padding: var(--wa-space-3xl) var(--wa-space-m);">
+			<h1 class="wa-heading-2xl">About Coffey</h1>
+			<p class="wa-body-l wa-color-text-quiet">Building the future of content, one post at a time.</p>
 		</section>
 
-		<section class="about-content">
+		<section class="wa-stack wa-gap-l">
 			<wa-card>
 				<h2 slot="header">Our Story</h2>
 				<p>
@@ -50,38 +50,8 @@ export function handleAbout(c: Context<{ Bindings: Env }>) {
 					Have questions or feedback? We'd love to hear from you. Reach out through our
 					admin portal or drop us a line.
 				</p>
-				<wa-button variant="primary" href="/blog">Read Our Blog</wa-button>
 			</wa-card>
 		</section>
-
-		<style>
-			.about-hero {
-				text-align: center;
-				padding: 3rem 1rem;
-				margin-bottom: 2rem;
-			}
-			.about-hero h1 {
-				font-size: 2.5rem;
-				margin-bottom: 1rem;
-			}
-			.about-hero .lead {
-				font-size: 1.25rem;
-				color: var(--wa-color-text-quiet);
-			}
-			.about-content {
-				display: grid;
-				gap: 1.5rem;
-			}
-			.about-content wa-card {
-				padding: 0.5rem;
-			}
-			.about-content ul {
-				padding-left: 1.5rem;
-			}
-			.about-content li {
-				margin-bottom: 0.5rem;
-			}
-		</style>
 	`;
 
 	const html = renderPage({

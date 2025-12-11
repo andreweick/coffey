@@ -3,49 +3,35 @@ import { renderPage } from "../ui/layout";
 
 export function handleHome(c: Context<{ Bindings: Env }>) {
 	const body = `
-		<section class="hero">
-			<h1>Welcome to Coffey</h1>
-			<p>A modern blog and content platform built on Cloudflare Workers.</p>
-			<wa-button href="/blog" variant="primary">Read the Blog</wa-button>
-		</section>
-		<section class="features">
-			<h2>Features</h2>
-			<div class="wa-grid" style="--wa-grid-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem;">
-				<wa-card>
-					<h3 slot="header">Fast & Global</h3>
-					<p>Powered by Cloudflare Workers, serving content from the edge worldwide.</p>
-				</wa-card>
-				<wa-card>
-					<h3 slot="header">PWA Ready</h3>
-					<p>Install as an app on your device for offline access.</p>
-				</wa-card>
-				<wa-card>
-					<h3 slot="header">Admin API</h3>
-					<p>OpenAPI-documented admin endpoints for content management.</p>
-				</wa-card>
+		<div class="wa-stack wa-gap-xl">
+			<div class="wa-stack wa-gap-m">
+				<h1 class="wa-heading-2xl">Coffey Roast Collection</h1>
+				<p class="wa-body-l wa-color-text-quiet">Premium single-origin beans, roasted to perfection.</p>
 			</div>
-		</section>
-		<style>
-			.hero {
-				text-align: center;
-				padding: 3rem 1rem;
-			}
-			.hero h1 {
-				font-size: 2.5rem;
-				margin-bottom: 1rem;
-			}
-			.hero p {
-				font-size: 1.25rem;
-				color: var(--wa-color-text-quiet);
-				margin-bottom: 2rem;
-			}
-			.features {
-				padding: 2rem 0;
-			}
-			.features h2 {
-				margin-bottom: 1.5rem;
-			}
-		</style>
+
+			<div class="wa-stack wa-gap-m">
+				<h2 class="wa-heading-l">Our Process</h2>
+				<p class="wa-body-m">Every batch begins with hand-selected beans from sustainable farms across Ethiopia, Colombia, and Guatemala. Our master roasters carefully develop each profile to bring out the unique characteristics of every origin.</p>
+				<p class="wa-body-m">From light and fruity to dark and bold, we craft roasts that celebrate the full spectrum of coffee flavor. Each bag is roasted to order and shipped within 48 hours.</p>
+			</div>
+
+			<wa-divider></wa-divider>
+
+			<div class="wa-grid wa-gap-l">
+				<div class="wa-stack wa-gap-s">
+					<strong class="wa-heading-m">Light Roast</strong>
+					<p class="wa-body-s wa-color-text-quiet">Bright acidity with notes of citrus and florals. Perfect for pour-over.</p>
+				</div>
+				<div class="wa-stack wa-gap-s">
+					<strong class="wa-heading-m">Medium Roast</strong>
+					<p class="wa-body-s wa-color-text-quiet">Balanced sweetness with caramel and nutty undertones. Great all-around.</p>
+				</div>
+				<div class="wa-stack wa-gap-s">
+					<strong class="wa-heading-m">Dark Roast</strong>
+					<p class="wa-body-s wa-color-text-quiet">Rich and smoky with chocolate finish. Ideal for espresso.</p>
+				</div>
+			</div>
+		</div>
 	`;
 
 	const html = renderPage({

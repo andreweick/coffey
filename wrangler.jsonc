@@ -3,41 +3,160 @@
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "coffey",
-	"main": "src/index.ts",
-	"compatibility_date": "2025-11-21",
-	"observability": {
-		"enabled": true
-	}
-	/**
-	 * Smart Placement
-	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
-	 */
-	// "placement": { "mode": "smart" }
-	/**
-	 * Bindings
-	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
-	 * databases, object storage, AI inference, real-time communication and more.
-	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
-	 */
-	/**
-	 * Environment Variables
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
-	 */
-	// "vars": { "MY_VARIABLE": "production_value" }
-	/**
-	 * Note: Use secrets to store sensitive data.
-	 * https://developers.cloudflare.com/workers/configuration/secrets/
-	 */
-	/**
-	 * Static Assets
-	 * https://developers.cloudflare.com/workers/static-assets/binding/
-	 */
-	// "assets": { "directory": "./public/", "binding": "ASSETS" }
-	/**
-	 * Service Bindings (communicate between multiple Workers)
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
-	 */
-	// "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "coffey",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-21",
+  "observability": {
+    "enabled": true,
+  },
+  "workers_dev": false,
+  "preview_urls": false,
+  /**
+   * Smart Placement
+   * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
+   */
+  // "placement": { "mode": "smart" }
+  /**
+   * Bindings
+   * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
+   * databases, object storage, AI inference, real-time communication and more.
+   * https://developers.cloudflare.com/workers/runtime-apis/bindings/
+   */
+  "env": {
+    "dev": {
+      "routes": [
+        {
+          "pattern": "dev.eick.com",
+          "custom_domain": true,
+        },
+      ],
+      "r2_buckets": [
+        {
+          "bucket_name": "coffey-stage",
+          "binding": "COFFEY_BUCKET",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "AUTH_TOKEN",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "AUTH_TOKEN",
+        },
+        {
+          "binding": "CLOUDFLARE_MEDIA_TOKEN",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "CLOUDFLARE_MEDIA_TOKEN",
+        },
+        {
+          "binding": "GOOGLE_PLACES_API",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "GOOGLE_PLACES_API",
+        },
+        {
+          "binding": "CF_HOSTED_IMAGES_HASH",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "CF_HOSTED_IMAGES_HASH",
+        },
+        {
+          "binding": "CF_HOSTED_IMAGES_KEYS_API_TOKEN",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "CF_HOSTED_IMAGES_KEYS_API_TOKEN",
+        },
+      ],
+      "vars": {
+        "CLOUDFLARE_ACCOUNT_ID": "5930846a5870031c415bb26e42e38833",
+        "TEAM_DOMAIN": "https://missionfocus.cloudflareaccess.com",
+        "POLICY_AUD": "c1767df7053d0046b051677141e5beb353dfec656f6fcea90194f9f599d9fe38",
+      },
+      "d1_databases": [
+        {
+          "binding": "COFFEY_DB",
+          "database_name": "coffey-prod",
+          "database_id": "c28fdd1b-1670-420d-8472-f1ee844b3622",
+          "remote": true,
+        },
+      ],
+    },
+    "prod": {
+      "routes": [
+        {
+          "pattern": "eick.com",
+          "custom_domain": true,
+        },
+      ],
+      "r2_buckets": [
+        {
+          "bucket_name": "coffey-production",
+          "binding": "COFFEY_BUCKET",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "AUTH_TOKEN",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "AUTH_TOKEN",
+        },
+        {
+          "binding": "CLOUDFLARE_MEDIA_TOKEN",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "CLOUDFLARE_MEDIA_TOKEN",
+        },
+        {
+          "binding": "GOOGLE_PLACES_API",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "GOOGLE_PLACES_API",
+        },
+        {
+          "binding": "CF_HOSTED_IMAGES_HASH",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "CF_HOSTED_IMAGES_HASH",
+        },
+        {
+          "binding": "CF_HOSTED_IMAGES_KEYS_API_TOKEN",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "CF_HOSTED_IMAGES_KEYS_API_TOKEN",
+        },
+      ],
+      "vars": {
+        "CLOUDFLARE_ACCOUNT_ID": "5930846a5870031c415bb26e42e38833",
+        "TEAM_DOMAIN": "https://missionfocus.cloudflareaccess.com",
+        "POLICY_AUD": "c1767df7053d0046b051677141e5beb353dfec656f6fcea90194f9f599d9fe38",
+      },
+      "d1_databases": [
+        {
+          "binding": "COFFEY_DB",
+          "database_name": "coffey-prod",
+          "database_id": "c28fdd1b-1670-420d-8472-f1ee844b3622",
+          "remote": true,
+        },
+      ],
+    },
+  },
+  "d1_databases": [
+    {
+      "binding": "COFFEY_DB",
+      "database_name": "coffey-prod",
+      "database_id": "c28fdd1b-1670-420d-8472-f1ee844b3622",
+      "remote": true,
+    },
+  ],
+  /**
+   * Environment Variables
+   * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
+   */
+  /**
+   * Note: Use secrets to store sensitive data.
+   * https://developers.cloudflare.com/workers/configuration/secrets/
+   */
+  /**
+   * Static Assets
+   * https://developers.cloudflare.com/workers/static-assets/binding/
+   */
+  // "assets": { "directory": "./public/", "binding": "ASSETS" }
+  /**
+   * Service Bindings (communicate between multiple Workers)
+   * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
+   */
+  // "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
 }

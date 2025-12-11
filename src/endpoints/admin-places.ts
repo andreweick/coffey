@@ -1,6 +1,10 @@
-import { Num, OpenAPIRoute, Str } from "chanfana";
+import { OpenAPIRoute } from "chanfana";
 import type { Context } from "hono";
-import { z } from "zod";
+import { standardErrorResponses } from "../schemas/common";
+import {
+	NearbyPlacesQuerySchema,
+	NearbyPlacesResponseSchema,
+} from "../schemas/places-schemas";
 import { fetchNearbyPlaces } from "../services/places";
 
 export class AdminNearbyPlacesEndpoint extends OpenAPIRoute {
@@ -8,33 +12,18 @@ export class AdminNearbyPlacesEndpoint extends OpenAPIRoute {
 		tags: ["admin"],
 		summary: "Get nearby places using Google Places (admin only)",
 		request: {
-			query: z.object({
-				lat: Num({ description: "Latitude", required: true }),
-				lng: Num({ description: "Longitude", required: true }),
-				q: Str({ description: "Search query/keyword", required: false }),
-				radius: Num({ description: "Search radius in meters", required: false, default: 1500 }),
-			}),
+			query: NearbyPlacesQuerySchema,
 		},
 		responses: {
 			"200": {
 				description: "List of nearby places",
 				content: {
 					"application/json": {
-						schema: z.object({
-							results: z.array(
-								z.object({
-									placeId: z.string(),
-									name: z.string(),
-									address: z.string().optional(),
-									lat: z.number(),
-									lng: z.number(),
-									types: z.array(z.string()).optional(),
-								})
-							),
-						}),
+						schema: NearbyPlacesResponseSchema,
 					},
 				},
 			},
+			...standardErrorResponses,
 		},
 	};
 

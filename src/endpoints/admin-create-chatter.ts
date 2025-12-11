@@ -1,0 +1,297 @@
+import { OpenAPIRoute } from "chanfana";
+import type { Context } from "hono";
+import { z } from "zod";
+import {
+	CreateChatterRequestSchema,
+	ChatterSchema,
+	type CreateChatterRequest,
+} from "../schemas/chatter-schemas";
+import { createChatter, storeChatter } from "../services/chatter-service";
+import { uploadImage } from "../services/image-upload";
+import { standardErrorResponses, responses } from "../schemas/common";
+import { errorResponse, getErrorMessage } from "../lib/errors";
+
+export class AdminCreateChatterEndpoint extends OpenAPIRoute {
+	schema = {
+		tags: ["admin"],
+		summary: "Create a new chatter post with environmental enrichment",
+		description:
+			"Creates a chatter post and enriches it with weather, air quality, pollen, elevation, geocoding, and place details data. " +
+			"Supports both JSON (with pre-uploaded image URLs) and multipart/form-data (with direct image uploads).",
+		request: {
+			body: {
+				content: {
+					"application/json": {
+						schema: CreateChatterRequestSchema,
+					},
+					"multipart/form-data": {
+						schema: z.object({
+							kind: z.literal("chatter").describe("Type identifier"),
+							content: z.string().optional().describe("Main text content"),
+							comment: z
+								.string()
+								.optional()
+								.describe("Private comment/note"),
+							title: z.string().optional().describe("Optional title"),
+							tags: z
+								.union([z.string(), z.array(z.string())])
+								.optional()
+								.describe(
+									"Tags as repeated fields or array (send multiple -F 'tags=value')"
+								),
+							images: z
+								.union([z.string(), z.instanceof(File), z.array(z.any())])
+								.optional()
+								.describe(
+									"Image files to upload AND/OR URLs to existing images"
+								),
+							links: z
+								.string()
+								.optional()
+								.describe("JSON string: single URL, array of URLs, or array of link objects"),
+							publish: z
+								.union([z.boolean(), z.string()])
+								.optional()
+								.describe("Publish flag (boolean or 'true'/'false' string)"),
+							location_hint: z
+								.string()
+								.optional()
+								.describe("JSON string of LocationHint object"),
+							place: z
+								.string()
+								.optional()
+								.describe("JSON string of PlaceInput object"),
+							watched: z
+								.string()
+								.optional()
+								.describe("JSON string of WatchedInput object"),
+						}),
+					},
+				},
+			},
+		},
+		responses: {
+			"201": {
+				description: "Chatter created successfully",
+				content: {
+					"application/json": {
+						schema: ChatterSchema,
+					},
+				},
+			},
+			"400": responses.badRequest("Invalid request payload"),
+			...standardErrorResponses,
+		},
+	};
+
+	async handle(c: Context<{ Bindings: Env }>) {
+		let rawBody: any = null;
+		try {
+			const contentType = c.req.header("content-type") || "";
+			let request: CreateChatterRequest;
+
+			if (contentType.includes("multipart/form-data")) {
+				// Parse multipart/form-data
+				request = await this.parseMultipartRequest(c);
+			} else {
+				// Parse JSON and capture raw body for debugging
+				try {
+					rawBody = await c.req.json();
+					} catch (e) {
+					throw new Error("Invalid JSON in request body");
+				}
+
+			// Transform flat fields to nested format (Apple Shortcuts compatibility)
+			if (rawBody.lat && rawBody.lng) {
+				rawBody.location_hint = {
+					lat: parseFloat(rawBody.lat),
+					lng: parseFloat(rawBody.lng),
+				};
+				delete rawBody.lat;
+				delete rawBody.lng;
+			}
+
+			if (rawBody.placeId) {
+				rawBody.place = {
+					provider_ids: {
+						google_places: rawBody.placeId,
+					},
+				};
+				delete rawBody.placeId;
+			}
+
+			// Validate with Zod schema manually (instead of getValidatedData to avoid double-read)
+			try {
+				request = CreateChatterRequestSchema.parse(rawBody);
+			} catch (validationError) {
+				throw validationError;
+			}
+		}
+
+		// Create enriched chatter with environment data
+		const chatter = await createChatter(request, c.env);
+
+		// Store to R2
+		await storeChatter(chatter, c.env);
+
+		return c.json(chatter, 201);
+	} catch (error) {
+		return c.json(errorResponse("Failed to create chatter", error), 500);
+	}
+}
+
+	/**
+	 * Parse multipart/form-data request into CreateChatterRequest
+	 */
+	private async parseMultipartRequest(
+		c: Context<{ Bindings: Env }>
+	): Promise<CreateChatterRequest> {
+		const formData = await c.req.formData();
+
+		// Extract simple fields
+		const kind = formData.get("kind") as string;
+		const content = formData.get("content") as string | null;
+		const comment = formData.get("comment") as string | null;
+		const title = formData.get("title") as string | null;
+
+		// Parse publish (boolean or string)
+		let publish: boolean | undefined;
+		const publishValue = formData.get("publish");
+		if (publishValue !== null) {
+			if (typeof publishValue === "string") {
+				publish = publishValue === "true";
+			} else {
+				publish = Boolean(publishValue);
+			}
+		}
+
+		// Collect tags (repeated field names)
+		const tags: string[] = [];
+		for (const [key, value] of formData.entries()) {
+			if (key === "tags" && typeof value === "string") {
+				tags.push(value);
+			}
+		}
+
+		// Parse JSON string fields for complex objects
+		let links, location_hint, place, watched;
+
+		// Check for flat GPS coordinates first (Apple Shortcuts friendly)
+		const flatLat = formData.get("lat");
+		const flatLng = formData.get("lng");
+		const flatPlaceId = formData.get("placeId");
+
+		if (flatLat && flatLng) {
+			location_hint = {
+				lat: parseFloat(flatLat as string),
+				lng: parseFloat(flatLng as string),
+			};
+		}
+
+		if (flatPlaceId) {
+			place = {
+				provider_ids: {
+					google_places: flatPlaceId as string,
+				},
+			};
+		}
+
+		const linksStr = formData.get("links");
+		if (linksStr && typeof linksStr === "string") {
+			try {
+				links = JSON.parse(linksStr);
+			} catch (e) {
+				throw new Error("Invalid JSON in links field");
+			}
+		}
+
+		// Fall back to JSON string format if flat fields weren't provided (backward compatibility)
+		if (!location_hint) {
+			const locationHintStr = formData.get("location_hint");
+			if (locationHintStr && typeof locationHintStr === "string") {
+				try {
+					location_hint = JSON.parse(locationHintStr);
+				} catch (e) {
+					throw new Error("Invalid JSON in location_hint field");
+				}
+			}
+		}
+
+		if (!place) {
+			const placeStr = formData.get("place");
+			if (placeStr && typeof placeStr === "string") {
+				try {
+					place = JSON.parse(placeStr);
+				} catch (e) {
+					throw new Error("Invalid JSON in place field");
+				}
+			}
+		}
+
+		const watchedStr = formData.get("watched");
+		if (watchedStr && typeof watchedStr === "string") {
+			try {
+				watched = JSON.parse(watchedStr);
+			} catch (e) {
+				throw new Error("Invalid JSON in watched field");
+			}
+		}
+
+		// Handle mixed images: File objects (to upload) AND string URLs (existing)
+		const imageUrls: string[] = [];
+		const imageFiles: File[] = [];
+
+		for (const [key, value] of formData.entries()) {
+			if (key === "images") {
+				if (value instanceof File) {
+					imageFiles.push(value);
+				} else if (typeof value === "string") {
+					imageUrls.push(value);
+				}
+			}
+		}
+
+		// Upload new image files
+		if (imageFiles.length > 0) {
+			for (const file of imageFiles) {
+				try {
+					const result = await uploadImage(file, c.env);
+					// Format as full URL matching admin form behavior
+					const imageUrl = `https://eick.com/${result.objectKey}/chatter`;
+					imageUrls.push(imageUrl);
+				} catch (error) {
+						throw new Error(
+						`Image upload failed for ${file.name}: ${getErrorMessage(error)}`
+					);
+				}
+			}
+		}
+
+		// Build request object
+		const request: CreateChatterRequest = {
+			kind: "chatter",
+			...(content && { content }),
+			...(comment && { comment }),
+			...(title && { title }),
+			...(tags.length > 0 && { tags }),
+			...(imageUrls.length > 0 && { images: imageUrls }),
+			...(links && { links }),
+			...(publish !== undefined && { publish }),
+			...(location_hint && { location_hint }),
+			...(place && { place }),
+			...(watched && { watched }),
+		};
+
+		// Validate with Zod schema
+		try {
+			return CreateChatterRequestSchema.parse(request);
+		} catch (error) {
+			if (error instanceof z.ZodError) {
+				throw new Error(
+					`Validation error: ${error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`
+				);
+			}
+			throw error;
+		}
+	}
+}
