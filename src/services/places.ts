@@ -29,6 +29,21 @@ export async function fetchNearbyPlaces(
 	params: FetchNearbyPlacesParams
 ): Promise<NearbyPlace[]> {
 	const { lat, lng, query, radius = 1500 } = params;
+
+	// Round coordinates to 4 decimal places (~11m precision) for cache key
+	const roundedLat = Math.round(lat * 10000) / 10000;
+	const roundedLng = Math.round(lng * 10000) / 10000;
+	const cacheKey = `https://cache.internal/places-nearby:${roundedLat},${roundedLng}:${radius}:${query || 'all'}`;
+
+	// Try to get from cache first
+	const cache = caches.default;
+	const cachedResponse = await cache.match(cacheKey);
+
+	if (cachedResponse) {
+		const cachedData = await cachedResponse.json() as NearbyPlace[];
+		return cachedData;
+	}
+
 	const apiKey = await env.GOOGLE_PLACES_API.get();
 
 	if (!apiKey) {
@@ -75,7 +90,7 @@ export async function fetchNearbyPlaces(
 		return [];
 	}
 
-	return data.places.map((place) => ({
+	const results = data.places.map((place) => ({
 		placeId: place.id,
 		name: place.displayName?.text || "Unknown",
 		address: place.formattedAddress,
@@ -83,4 +98,15 @@ export async function fetchNearbyPlaces(
 		lng: place.location?.longitude || 0,
 		types: place.types,
 	}));
+
+	// Cache the results for 3 hours (10800 seconds)
+	const cacheResponse = new Response(JSON.stringify(results), {
+		headers: {
+			"Content-Type": "application/json",
+			"Cache-Control": "public, max-age=10800", // 3 hours
+		},
+	});
+	await cache.put(cacheKey, cacheResponse);
+
+	return results;
 }

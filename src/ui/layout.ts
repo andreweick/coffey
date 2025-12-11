@@ -6,12 +6,13 @@ export interface PageOptions {
   body: string;
   navHtml?: string;
   footerHtml?: string;
+  version?: string;
 }
 
 export function renderPage(options: PageOptions): string {
-  const { title, description, body, navHtml, footerHtml } = options;
+  const { title, description, body, navHtml, footerHtml, version } = options;
   const nav = navHtml ?? renderNav();
-  const footer = footerHtml ?? renderFooter();
+  const footer = footerHtml ?? renderFooter(version);
   const metaDescription = description
     ? `<meta name="description" content="${escapeHtml(description)}">`
     : "";
@@ -22,7 +23,6 @@ export function renderPage(options: PageOptions): string {
 	<meta charset="UTF-8">
 	<title>${escapeHtml(title)}</title>
 	${metaDescription}
-	<link rel="manifest" href="/manifest.json">
 	<script src="https://kit.webawesome.com/d1309049507a45d3.js" crossorigin="anonymous"></script>
 </head>
 <body>

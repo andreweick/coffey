@@ -31,6 +31,12 @@
           "custom_domain": true,
         },
       ],
+      "kv_namespaces": [
+        {
+          "binding": "COFFEY_KV",
+          "id": "6ee8795564444f7eb94482a8736ce8e1",
+        },
+      ],
       "r2_buckets": [
         {
           "bucket_name": "coffey-stage",
@@ -59,6 +65,11 @@
           "secret_name": "CF_HOSTED_IMAGES_HASH",
         },
         {
+          "binding": "RAINDROP_TEST_TOKEN",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "RAINDROP_TEST_TOKEN",
+        },
+        {
           "binding": "CF_HOSTED_IMAGES_KEYS_API_TOKEN",
           "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
           "secret_name": "CF_HOSTED_IMAGES_KEYS_API_TOKEN",
@@ -68,6 +79,7 @@
         "CLOUDFLARE_ACCOUNT_ID": "5930846a5870031c415bb26e42e38833",
         "TEAM_DOMAIN": "https://missionfocus.cloudflareaccess.com",
         "POLICY_AUD": "c1767df7053d0046b051677141e5beb353dfec656f6fcea90194f9f599d9fe38",
+        "VERSION": "{{CF_DEPLOYMENT_ID}}", // Auto-populated by Cloudflare
       },
       "d1_databases": [
         {
@@ -83,6 +95,12 @@
         {
           "pattern": "eick.com",
           "custom_domain": true,
+        },
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "COFFEY_KV",
+          "id": "6ee8795564444f7eb94482a8736ce8e1",
         },
       ],
       "r2_buckets": [
@@ -113,6 +131,11 @@
           "secret_name": "CF_HOSTED_IMAGES_HASH",
         },
         {
+          "binding": "RAINDROP_TEST_TOKEN",
+          "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
+          "secret_name": "RAINDROP_TEST_TOKEN",
+        },
+        {
           "binding": "CF_HOSTED_IMAGES_KEYS_API_TOKEN",
           "store_id": "ab77e0b35ab549129fc55c15abf1dcd8",
           "secret_name": "CF_HOSTED_IMAGES_KEYS_API_TOKEN",
@@ -122,6 +145,7 @@
         "CLOUDFLARE_ACCOUNT_ID": "5930846a5870031c415bb26e42e38833",
         "TEAM_DOMAIN": "https://missionfocus.cloudflareaccess.com",
         "POLICY_AUD": "c1767df7053d0046b051677141e5beb353dfec656f6fcea90194f9f599d9fe38",
+        "VERSION": "{{CF_DEPLOYMENT_ID}}", // Auto-populated by Cloudflare
       },
       "d1_databases": [
         {

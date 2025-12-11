@@ -1,715 +1,696 @@
 import type { Context } from "hono";
+import { renderPage } from "../ui/layout";
 
 export function handleAdminChatterNew(c: Context<{ Bindings: Env }>) {
-	const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-	<title>Create Chatter - Coffey</title>
-	<style>
-		body {
-			max-width: 600px;
-			margin: 0 auto;
-			padding: 20px;
-		}
+	const body = `
+		<div class="wa-stack wa-gap-xl">
+			<div id="dev-banner" style="display: none; background: #ff9800; color: #000; padding: 10px; text-align: center; font-weight: bold; font-size: 52px; border-bottom: 3px solid #f57c00;">
+				⚠️ DEVELOPMENT SERVER ⚠️
+			</div>
 
-		#dev-banner {
-			display: none;
-			background: #ff9800;
-			color: #000;
-			padding: 10px;
-			text-align: center;
-			font-weight: bold;
-			font-size: 18px;
-			border-bottom: 3px solid #f57c00;
-		}
+			<h1 style="font-size: 52px;">Create Chatter</h1>
 
-		/* Prevent mobile zoom on input focus */
-		input, textarea, select {
-			font-size: 20px;
-		}
-	</style>
-</head>
-<body>
-	<div id="dev-banner">⚠️ DEVELOPMENT SERVER ⚠️</div>
+			<div id="status" style="font-size: 52px; font-weight: bold;"></div>
+			<div id="error" style="font-size: 52px; color: red; font-weight: bold;"></div>
 
-	<h1>Create Chatter</h1>
+			<wa-button id="location-btn" variant="primary" size="large" style="font-size: 52px;">Enable Location</wa-button>
 
-	<div id="status"></div>
-	<div id="error"></div>
+			<form id="form" class="wa-stack wa-gap-l">
+				<div class="wa-stack wa-gap-m">
+					<wa-textarea id="content" label="Content (optional)" rows="5" placeholder="What's happening?" size="large" style="font-size: 52px;"></wa-textarea>
+				</div>
 
-	<button id="location-btn" onclick="requestLocation()">Enable Location</button>
+				<div class="wa-stack wa-gap-m">
+					<label style="font-size: 52px;"><strong>Links (optional)</strong></label>
+					<div id="links-container" class="wa-stack wa-gap-m"></div>
+					<wa-button type="button" id="add-link-btn" variant="default" size="large" style="font-size: 52px;">+ Add Link</wa-button>
+				</div>
 
-	<form id="form" onsubmit="submitForm(event)">
-		<label for="title">Title (optional)</label>
-		<input type="text" id="title" placeholder="Optional title">
-		<br><br>
+				<div class="wa-stack wa-gap-m">
+					<label style="font-size: 52px;"><strong>Images (optional)</strong></label>
+					<input type="file" id="image-files" accept="image/jpeg,image/png,image/gif,image/webp" multiple style="font-size: 52px;">
+					<div id="image-preview-container" style="display: flex; flex-wrap: wrap; gap: 10px;"></div>
+				</div>
 
-		<label for="content">Content (optional)</label><br>
-		<textarea id="content" rows="5" cols="50" placeholder="What's happening?"></textarea>
-		<br><br>
+				<wa-button type="submit" variant="primary" size="large" style="font-size: 52px;">Create Chatter</wa-button>
+			</form>
 
-		<label for="comment">Comment (optional)</label><br>
-		<textarea id="comment" rows="3" cols="50" placeholder="Private notes about this chatter"></textarea>
-		<br><br>
-
-		<label>Links (optional)</label><br>
-		<div id="links-container"></div>
-		<button type="button" onclick="addLinkField()">+ Add Link</button>
-		<br><br>
-
-		<label>Images (optional)</label><br>
-		<input type="file" id="image-files" accept="image/jpeg,image/png,image/gif,image/webp" multiple>
-		<div id="image-preview-container" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
-		<br><br>
-
-		<button type="submit">Create Chatter</button>
-	</form>
-
-	<div id="places"></div>
-
-	<div id="filters" style="margin: 20px 0; padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">
-		<h3 style="margin-top: 0;">Filter Places by Category</h3>
-		<button type="button" onclick="selectAllCategories()" style="margin-bottom: 10px; padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Select All</button>
-		<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
-			<label><input type="checkbox" id="filter_food_drink" value="food_drink" onchange="toggleCategory('food_drink')" checked> Food & Drink</label>
-			<label><input type="checkbox" id="filter_coffee_tea" value="coffee_tea" onchange="toggleCategory('coffee_tea')" checked> Coffee & Tea</label>
-			<label><input type="checkbox" id="filter_dessert" value="dessert" onchange="toggleCategory('dessert')" checked> Desserts & Bakeries</label>
-			<label><input type="checkbox" id="filter_nightlife" value="nightlife" onchange="toggleCategory('nightlife')"> Nightlife</label>
-			<label><input type="checkbox" id="filter_shopping" value="shopping" onchange="toggleCategory('shopping')"> Shopping</label>
-			<label><input type="checkbox" id="filter_lodging" value="lodging" onchange="toggleCategory('lodging')"> Hotels & Stays</label>
-			<label><input type="checkbox" id="filter_entertainment" value="entertainment" onchange="toggleCategory('entertainment')"> Entertainment</label>
-			<label><input type="checkbox" id="filter_outdoors" value="outdoors" onchange="toggleCategory('outdoors')"> Parks & Outdoors</label>
-			<label><input type="checkbox" id="filter_sports_fitness" value="sports_fitness" onchange="toggleCategory('sports_fitness')"> Sports & Fitness</label>
-			<label><input type="checkbox" id="filter_culture_museum" value="culture_museum" onchange="toggleCategory('culture_museum')"> Museums & Culture</label>
-			<label><input type="checkbox" id="filter_education" value="education" onchange="toggleCategory('education')"> Education</label>
-			<label><input type="checkbox" id="filter_transport" value="transport" onchange="toggleCategory('transport')"> Transport Hubs</label>
-			<label><input type="checkbox" id="filter_health" value="health" onchange="toggleCategory('health')"> Health & Wellness</label>
-			<label><input type="checkbox" id="filter_services" value="services" onchange="toggleCategory('services')"> Services</label>
-			<label><input type="checkbox" id="filter_work_office" value="work_office" onchange="toggleCategory('work_office')"> Offices & Work</label>
-			<label><input type="checkbox" id="filter_other" value="other" onchange="toggleCategory('other')"> Other</label>
+			<div id="places" class="wa-stack wa-gap-l"></div>
+			<div id="response"></div>
 		</div>
-	</div>
 
-	<div id="response"></div>
+		<script>
+			// ========== DEV BANNER ==========
 
-	<script>
-		// ========== DEV BANNER ==========
-
-		// Show development server banner if on dev.eick.com
-		if (window.location.hostname === 'dev.eick.com') {
-			document.getElementById('dev-banner').style.display = 'block';
-		}
-
-		// ========== URL PARAMETER PARSING ==========
-
-		function parseURLParams() {
-			const params = new URLSearchParams(window.location.search);
-
-			// Prepopulate title
-			if (params.has('title')) {
-				document.getElementById('title').value = params.get('title');
+			if (window.location.hostname === 'dev.eick.com') {
+				document.getElementById('dev-banner').style.display = 'block';
 			}
 
-			// Prepopulate content
-			if (params.has('content')) {
-				document.getElementById('content').value = params.get('content');
-			}
+			// ========== URL PARAMETER PARSING ==========
 
-			// Prepopulate comment
-			if (params.has('comment')) {
-				document.getElementById('comment').value = params.get('comment');
-			}
+			function parseURLParams() {
+				const params = new URLSearchParams(window.location.search);
 
-			// Add any URL parameters as links
-			const urls = params.getAll('url');
-			urls.forEach(url => {
-				if (url.trim()) {
-					addLinkField(url.trim());
+				// Prepopulate content
+				if (params.has('content')) {
+					document.getElementById('content').value = params.get('content');
 				}
-			});
-		}
 
-		// ========== IMAGE MANAGEMENT ==========
-
-		let selectedImages = [];
-
-		function handleImageSelection(event) {
-			const files = Array.from(event.target.files || []);
-			selectedImages = files;
-			displayImagePreviews(files);
-		}
-
-		function displayImagePreviews(files) {
-			const container = document.getElementById('image-preview-container');
-			container.innerHTML = '';
-
-			files.forEach((file, index) => {
-				const reader = new FileReader();
-				reader.onload = function(e) {
-					const previewDiv = document.createElement('div');
-					previewDiv.style.cssText = 'position: relative; width: 100px; height: 100px;';
-
-					const img = document.createElement('img');
-					img.src = e.target.result;
-					img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; border: 2px solid #ccc; border-radius: 4px;';
-
-					const fileName = document.createElement('div');
-					fileName.textContent = file.name;
-					fileName.style.cssText = 'font-size: 10px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-
-					const removeBtn = document.createElement('button');
-					removeBtn.type = 'button';
-					removeBtn.textContent = '×';
-					removeBtn.style.cssText = 'position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 14px; line-height: 1;';
-					removeBtn.onclick = function() {
-						removeImage(index);
-					};
-
-					previewDiv.appendChild(img);
-					previewDiv.appendChild(removeBtn);
-					previewDiv.appendChild(fileName);
-					container.appendChild(previewDiv);
-				};
-				reader.readAsDataURL(file);
-			});
-		}
-
-		function removeImage(index) {
-			const fileInput = document.getElementById('image-files');
-			const dt = new DataTransfer();
-
-			selectedImages.forEach((file, i) => {
-				if (i !== index) {
-					dt.items.add(file);
-				}
-			});
-
-			fileInput.files = dt.files;
-			selectedImages = Array.from(dt.files);
-			displayImagePreviews(selectedImages);
-		}
-
-		// Attach event listener to file input
-		document.addEventListener('DOMContentLoaded', function() {
-			const fileInput = document.getElementById('image-files');
-			if (fileInput) {
-				fileInput.addEventListener('change', handleImageSelection);
-			}
-		});
-
-		async function uploadImages(files) {
-			const imageUrls = [];
-			const totalFiles = files.length;
-
-			for (let i = 0; i < files.length; i++) {
-				const file = files[i];
-				document.getElementById('status').textContent = \`Uploading image \${i + 1}/\${totalFiles}: \${file.name}...\`;
-
-				try {
-					const formData = new FormData();
-					formData.append('file', file);
-
-					const response = await fetch('/api/admin/images', {
-						method: 'POST',
-						body: formData
-					});
-
-					if (!response.ok) {
-						throw new Error(\`Failed to upload \${file.name}: HTTP \${response.status}\`);
+				// Add any URL parameters as links
+				const urls = params.getAll('url');
+				urls.forEach(url => {
+					if (url.trim()) {
+						addLinkField(url.trim());
 					}
-
-					const result = await response.json();
-
-					// Transform objectKey to full URL with /chatter suffix
-					const imageUrl = \`https://eick.com/\${result.objectKey}/chatter\`;
-					imageUrls.push(imageUrl);
-
-				} catch (error) {
-					// Upload failed - abort everything
-					throw new Error(\`Image upload failed for "\${file.name}": \${error.message}\`);
-				}
+				});
 			}
 
-			return imageUrls;
-		}
+			// ========== IMAGE MANAGEMENT ==========
 
-		// ========== LINKS MANAGEMENT ==========
+			let selectedImages = [];
 
-		let linkCount = 0;
-
-		function addLinkField(initialUrl = '') {
-			const container = document.getElementById('links-container');
-			const linkId = linkCount++;
-
-			const linkDiv = document.createElement('div');
-			linkDiv.id = 'link-' + linkId;
-			linkDiv.style.marginBottom = '10px';
-
-			linkDiv.innerHTML = \`
-				<input type="url" id="link-url-\${linkId}" placeholder="https://example.com" style="width: 400px;" required value="\${initialUrl}">
-				<button type="button" onclick="removeLinkField(\${linkId})">Remove</button>
-			\`;
-
-			container.appendChild(linkDiv);
-		}
-
-		function removeLinkField(linkId) {
-			const linkDiv = document.getElementById('link-' + linkId);
-			if (linkDiv) {
-				linkDiv.remove();
-			}
-		}
-
-		function getLinks() {
-			const links = [];
-			const container = document.getElementById('links-container');
-			const linkDivs = container.querySelectorAll('[id^="link-"]');
-
-			linkDivs.forEach(div => {
-				const linkId = div.id.split('-')[1];
-				const urlInput = document.getElementById('link-url-' + linkId);
-				if (urlInput && urlInput.value.trim()) {
-					links.push({
-						url: urlInput.value.trim()
-					});
-				}
-			});
-
-			return links;
-		}
-
-		// ========== CATEGORY SYSTEM ==========
-
-		// Category type buckets
-		const FOOD_CORE = new Set([
-			'restaurant', 'bar_and_grill', 'barbecue_restaurant', 'breakfast_restaurant',
-			'brunch_restaurant', 'buffet_restaurant', 'deli', 'diner', 'food_court'
-		]);
-
-		const COFFEE_TEA = new Set([
-			'cafe', 'coffee_shop', 'tea_house', 'acai_shop', 'juice_shop',
-			'cat_cafe', 'dog_cafe'
-		]);
-
-		const NIGHTLIFE = new Set([
-			'bar', 'pub', 'wine_bar', 'night_club', 'karaoke', 'comedy_club'
-		]);
-
-		const DESSERT = new Set([
-			'bakery', 'ice_cream_shop', 'dessert_shop', 'candy_store', 'donut_shop'
-		]);
-
-		const LODGING = new Set([
-			'hotel', 'motel', 'hostel', 'bed_and_breakfast', 'guest_house', 'inn',
-			'resort_hotel', 'extended_stay_hotel', 'campground', 'camping_cabin',
-			'farmstay', 'rv_park', 'cottage', 'lodging'
-		]);
-
-		const SHOPPING = new Set([
-			'shopping_mall', 'market', 'supermarket', 'grocery_store', 'convenience_store',
-			'department_store', 'discount_store', 'warehouse_store', 'store',
-			'clothing_store', 'shoe_store', 'book_store', 'electronics_store',
-			'furniture_store', 'gift_shop', 'home_goods_store', 'home_improvement_store',
-			'hardware_store', 'liquor_store', 'pet_store', 'sporting_goods_store',
-			'bicycle_store', 'auto_parts_store', 'asian_grocery_store', 'butcher_shop',
-			'cell_phone_store'
-		]);
-
-		const ENTERTAINMENT = new Set([
-			'movie_theater', 'movie_rental', 'video_arcade', 'amusement_center',
-			'amusement_park', 'water_park', 'roller_coaster', 'community_center',
-			'event_venue', 'convention_center', 'banquet_hall', 'wedding_venue',
-			'visitor_center', 'plaza', 'marina', 'tourist_attraction'
-		]);
-
-		const OUTDOORS = new Set([
-			'park', 'national_park', 'state_park', 'botanical_garden', 'garden',
-			'dog_park', 'playground', 'hiking_area', 'wildlife_park', 'wildlife_refuge',
-			'beach'
-		]);
-
-		const SPORTS_FITNESS = new Set([
-			'gym', 'fitness_center', 'sports_club', 'sports_complex', 'arena',
-			'stadium', 'athletic_field', 'swimming_pool', 'ski_resort', 'golf_course',
-			'ice_skating_rink', 'sports_activity_location', 'sports_coaching',
-			'cycling_park', 'skateboard_park'
-		]);
-
-		const CULTURE = new Set([
-			'art_gallery', 'museum', 'cultural_center', 'historical_place',
-			'historical_landmark', 'cultural_landmark', 'monument', 'zoo', 'aquarium'
-		]);
-
-		const EDUCATION = new Set(['library', 'university']);
-
-		const TRANSPORT = new Set([
-			'airport', 'international_airport', 'airstrip', 'train_station',
-			'subway_station', 'bus_station', 'bus_stop', 'transit_station',
-			'transit_depot', 'ferry_terminal', 'park_and_ride', 'taxi_stand',
-			'truck_stop'
-		]);
-
-		const HEALTH = new Set([
-			'hospital', 'doctor', 'dental_clinic', 'dentist', 'pharmacy', 'drugstore',
-			'spa', 'wellness_center', 'massage', 'yoga_studio', 'sauna',
-			'skin_care_clinic', 'tanning_studio', 'physiotherapist', 'chiropractor'
-		]);
-
-		const SERVICES = new Set([
-			'hair_salon', 'hair_care', 'barber_shop', 'laundry', 'tour_agency',
-			'tourist_information_center', 'travel_agency', 'funeral_home',
-			'storage', 'cemetery'
-		]);
-
-		const WORK = new Set(['corporate_office']);
-
-		const CATEGORY_META = {
-			food_drink: { id: 'food_drink', label: 'Food & Drink', weight: 10 },
-			coffee_tea: { id: 'coffee_tea', label: 'Coffee & Tea', weight: 20 },
-			dessert: { id: 'dessert', label: 'Desserts & Bakeries', weight: 30 },
-			nightlife: { id: 'nightlife', label: 'Nightlife', weight: 40 },
-			shopping: { id: 'shopping', label: 'Shopping', weight: 50 },
-			lodging: { id: 'lodging', label: 'Hotels & Stays', weight: 60 },
-			entertainment: { id: 'entertainment', label: 'Entertainment', weight: 70 },
-			outdoors: { id: 'outdoors', label: 'Parks & Outdoors', weight: 80 },
-			sports_fitness: { id: 'sports_fitness', label: 'Sports & Fitness', weight: 90 },
-			culture_museum: { id: 'culture_museum', label: 'Museums & Culture', weight: 100 },
-			education: { id: 'education', label: 'Education', weight: 110 },
-			transport: { id: 'transport', label: 'Transport Hubs', weight: 130 },
-			health: { id: 'health', label: 'Health & Wellness', weight: 140 },
-			services: { id: 'services', label: 'Services', weight: 150 },
-			work_office: { id: 'work_office', label: 'Offices & Work', weight: 160 },
-			other: { id: 'other', label: 'Other', weight: 999 }
-		};
-
-		// Category helper functions
-		function isCheckinType(primaryType) {
-			if (!primaryType) return false;
-			if (primaryType === 'restaurant' || primaryType.endsWith('_restaurant')) {
-				return true;
-			}
-			return FOOD_CORE.has(primaryType) || COFFEE_TEA.has(primaryType) ||
-				NIGHTLIFE.has(primaryType) || DESSERT.has(primaryType) ||
-				LODGING.has(primaryType) || SHOPPING.has(primaryType) ||
-				ENTERTAINMENT.has(primaryType) || OUTDOORS.has(primaryType) ||
-				SPORTS_FITNESS.has(primaryType) || CULTURE.has(primaryType) ||
-				EDUCATION.has(primaryType) || TRANSPORT.has(primaryType) ||
-				HEALTH.has(primaryType) || SERVICES.has(primaryType) ||
-				WORK.has(primaryType);
-		}
-
-		function getCheckinCategory(primaryType) {
-			if (!primaryType) return 'other';
-
-			if (primaryType === 'restaurant' || primaryType.endsWith('_restaurant')) {
-				return 'food_drink';
+			function handleImageSelection(event) {
+				const files = Array.from(event.target.files || []);
+				selectedImages = files;
+				displayImagePreviews(files);
 			}
 
-			if (COFFEE_TEA.has(primaryType)) return 'coffee_tea';
-			if (NIGHTLIFE.has(primaryType)) return 'nightlife';
-			if (DESSERT.has(primaryType)) return 'dessert';
-			if (FOOD_CORE.has(primaryType)) return 'food_drink';
-			if (LODGING.has(primaryType)) return 'lodging';
-			if (SHOPPING.has(primaryType)) return 'shopping';
-			if (ENTERTAINMENT.has(primaryType)) return 'entertainment';
-			if (OUTDOORS.has(primaryType)) return 'outdoors';
-			if (SPORTS_FITNESS.has(primaryType)) return 'sports_fitness';
-			if (CULTURE.has(primaryType)) return 'culture_museum';
-			if (EDUCATION.has(primaryType)) return 'education';
-			if (TRANSPORT.has(primaryType)) return 'transport';
-			if (HEALTH.has(primaryType)) return 'health';
-			if (SERVICES.has(primaryType)) return 'services';
-			if (WORK.has(primaryType)) return 'work_office';
+			function displayImagePreviews(files) {
+				const container = document.getElementById('image-preview-container');
+				container.innerHTML = '';
 
-			return 'other';
-		}
+				files.forEach((file, index) => {
+					const reader = new FileReader();
+					reader.onload = function(e) {
+						const previewDiv = document.createElement('div');
+						previewDiv.style.cssText = 'position: relative; width: 100px; height: 100px;';
 
-		// ========== FILTER MANAGEMENT ==========
+						const img = document.createElement('img');
+						img.src = e.target.result;
+						img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; border: 2px solid #ccc; border-radius: 4px;';
 
-		function toggleCategory(categoryId) {
-			if (enabledCategories.has(categoryId)) {
-				enabledCategories.delete(categoryId);
-			} else {
-				enabledCategories.add(categoryId);
-			}
+						const fileName = document.createElement('div');
+						fileName.textContent = file.name;
+						fileName.style.cssText = 'font-size: 10px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
 
-			// Re-render places if they've been loaded
-			if (window.placesData && window.geocodeData) {
-				displayPlaces(window.placesData, window.geocodeData);
-			}
-		}
-
-		function selectAllCategories() {
-			// Enable all categories
-			const allCategories = [
-				'food_drink', 'coffee_tea', 'dessert', 'nightlife', 'shopping',
-				'lodging', 'entertainment', 'outdoors', 'sports_fitness',
-				'culture_museum', 'education', 'transport', 'health', 'services',
-				'work_office', 'other'
-			];
-
-			allCategories.forEach(cat => enabledCategories.add(cat));
-
-			// Check all checkboxes
-			allCategories.forEach(cat => {
-				const checkbox = document.getElementById('filter_' + cat);
-				if (checkbox) {
-					checkbox.checked = true;
-				}
-			});
-
-			// Re-render places if they've been loaded
-			if (window.placesData && window.geocodeData) {
-				displayPlaces(window.placesData, window.geocodeData);
-			}
-		}
-
-		// ========== EXISTING STATE ==========
-
-		let selectedPlace = null;
-		let userCoords = null;
-		const LOCATION_STORAGE_KEY = 'chatter_last_location';
-		const SIGNIFICANT_DISTANCE = 0.01; // ~1km in degrees
-
-		// Filter state - default enabled: food_drink, coffee_tea, dessert
-		const enabledCategories = new Set(['food_drink', 'coffee_tea', 'dessert']);
-
-		// Calculate simple distance between two coordinates
-		function getDistance(lat1, lng1, lat2, lng2) {
-			const dLat = lat2 - lat1;
-			const dLng = lng2 - lng1;
-			return Math.sqrt(dLat * dLat + dLng * dLng);
-		}
-
-		// Store coordinates in localStorage
-		function storeCoordinates(lat, lng) {
-			localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify({
-				lat,
-				lng,
-				timestamp: Date.now()
-			}));
-		}
-
-		// Get stored coordinates from localStorage
-		function getStoredCoordinates() {
-			const stored = localStorage.getItem(LOCATION_STORAGE_KEY);
-			return stored ? JSON.parse(stored) : null;
-		}
-
-		// Check if coordinates have changed significantly
-		function hasLocationChanged(newLat, newLng) {
-			const stored = getStoredCoordinates();
-			if (!stored) return true;
-
-			const distance = getDistance(stored.lat, stored.lng, newLat, newLng);
-			return distance > SIGNIFICANT_DISTANCE;
-		}
-
-		async function requestLocation() {
-
-			try {
-				document.getElementById('status').textContent = 'Requesting location...';
-				document.getElementById('error').textContent = '';
-
-				if (!navigator.geolocation) {
-					document.getElementById('error').textContent = 'Geolocation not supported';
-					return;
-				}
-
-
-				navigator.geolocation.getCurrentPosition(
-					async (position) => {
-						const newLat = position.coords.latitude;
-						const newLng = position.coords.longitude;
-
-						userCoords = {
-							lat: newLat,
-							lng: newLng
+						const removeBtn = document.createElement('button');
+						removeBtn.type = 'button';
+						removeBtn.textContent = '×';
+						removeBtn.style.cssText = 'position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 14px; line-height: 1;';
+						removeBtn.onclick = function() {
+							removeImage(index);
 						};
 
-						// Check if location has changed significantly
-						if (hasLocationChanged(newLat, newLng)) {
-							document.getElementById('status').textContent = 'Location changed, updating places...';
-						}
+						previewDiv.appendChild(img);
+						previewDiv.appendChild(removeBtn);
+						previewDiv.appendChild(fileName);
+						container.appendChild(previewDiv);
+					};
+					reader.readAsDataURL(file);
+				});
+			}
 
-						// Store new coordinates
-						storeCoordinates(newLat, newLng);
+			function removeImage(index) {
+				const fileInput = document.getElementById('image-files');
+				const dt = new DataTransfer();
 
-						await loadPlaces(userCoords.lat, userCoords.lng);
-					},
-					(error) => {
-
-						let errorMsg = 'Location error: ' + error.message;
-						if (error.code === 1) {
-							errorMsg += ' (PERMISSION_DENIED)';
-						} else if (error.code === 2) {
-							errorMsg += ' (POSITION_UNAVAILABLE)';
-						} else if (error.code === 3) {
-							errorMsg += ' (TIMEOUT)';
-						}
-
-						document.getElementById('error').textContent = errorMsg;
-						document.getElementById('status').textContent = '';
-					},
-					{
-						enableHighAccuracy: true,
-						timeout: 10000,
-						maximumAge: 0
+				selectedImages.forEach((file, i) => {
+					if (i !== index) {
+						dt.items.add(file);
 					}
-				);
+				});
 
-			} catch (e) {
-				document.getElementById('error').textContent = 'Exception: ' + e.message;
+				fileInput.files = dt.files;
+				selectedImages = Array.from(dt.files);
+				displayImagePreviews(selectedImages);
 			}
-		}
 
-		async function loadPlaces(lat, lng) {
-			document.getElementById('status').textContent = 'Finding nearby places...';
+			document.addEventListener('DOMContentLoaded', function() {
+				const fileInput = document.getElementById('image-files');
+				if (fileInput) {
+					fileInput.addEventListener('change', handleImageSelection);
+				}
+			});
 
-			try {
-				const placesUrl = \`/api/admin/places/nearby?lat=\${lat}&lng=\${lng}&radius=500\`;
-				const placesResponse = await fetch(placesUrl);
-				const placesData = await placesResponse.json();
+			async function uploadImages(files) {
+				const imageUrls = [];
+				const totalFiles = files.length;
 
-				const geocodeUrl = \`/api/admin/geocode/reverse?lat=\${lat}&lng=\${lng}\`;
-				const geocodeResponse = await fetch(geocodeUrl);
-				const geocodeData = await geocodeResponse.json();
+				for (let i = 0; i < files.length; i++) {
+					const file = files[i];
+					document.getElementById('status').textContent = \`Uploading image \${i + 1}/\${totalFiles}: \${file.name}...\`;
 
-				displayPlaces(placesData.results || [], geocodeData);
+					try {
+						const formData = new FormData();
+						formData.append('file', file);
 
-				document.getElementById('location-btn').textContent = 'Update Places';
-			} catch (error) {
-				document.getElementById('error').textContent = 'Failed to load places: ' + error.message;
-				document.getElementById('status').textContent = '';
+						const response = await fetch('/api/admin/images', {
+							method: 'POST',
+							body: formData
+						});
+
+						if (!response.ok) {
+							throw new Error(\`Failed to upload \${file.name}: HTTP \${response.status}\`);
+						}
+
+						const result = await response.json();
+						const imageUrl = \`https://eick.com/\${result.objectKey}/chatter\`;
+						imageUrls.push(imageUrl);
+
+					} catch (error) {
+						throw new Error(\`Image upload failed for "\${file.name}": \${error.message}\`);
+					}
+				}
+
+				return imageUrls;
 			}
-		}
 
-		function categorizePlaces(places) {
-			const categorizedPlaces = {};
-			places.forEach(place => {
-				const primaryType = place.types && place.types[0] ? place.types[0] : null;
-				const category = getCheckinCategory(primaryType);
+			// ========== LINKS MANAGEMENT ==========
 
-				if (enabledCategories.has(category)) {
+			let linkCount = 0;
+
+			function addLinkField(initialUrl = '') {
+				const container = document.getElementById('links-container');
+				const linkId = linkCount++;
+
+				const linkDiv = document.createElement('div');
+				linkDiv.id = 'link-' + linkId;
+				linkDiv.style.cssText = 'display: flex; gap: 10px; align-items: center;';
+
+				const input = document.createElement('wa-input');
+				input.id = 'link-url-' + linkId;
+				input.type = 'url';
+				input.placeholder = 'https://example.com';
+				input.value = initialUrl;
+				input.required = true;
+				input.size = 'large';
+				input.style.cssText = 'flex: 1; font-size: 52px;';
+
+				const removeBtn = document.createElement('wa-button');
+				removeBtn.type = 'button';
+				removeBtn.textContent = 'Remove';
+				removeBtn.variant = 'default';
+				removeBtn.size = 'large';
+				removeBtn.style.fontSize = '52px';
+				removeBtn.onclick = function() {
+					removeLinkField(linkId);
+				};
+
+				linkDiv.appendChild(input);
+				linkDiv.appendChild(removeBtn);
+				container.appendChild(linkDiv);
+			}
+
+			function removeLinkField(linkId) {
+				const linkDiv = document.getElementById('link-' + linkId);
+				if (linkDiv) {
+					linkDiv.remove();
+				}
+			}
+
+			function getLinks() {
+				const links = [];
+				const container = document.getElementById('links-container');
+				const linkDivs = container.querySelectorAll('[id^="link-"]');
+
+				linkDivs.forEach(div => {
+					const linkId = div.id.split('-')[1];
+					const urlInput = document.getElementById('link-url-' + linkId);
+					if (urlInput && urlInput.value.trim()) {
+						links.push({
+							url: urlInput.value.trim()
+						});
+					}
+				});
+
+				return links;
+			}
+
+			// Add link button handler
+			document.addEventListener('DOMContentLoaded', function() {
+				const addLinkBtn = document.getElementById('add-link-btn');
+				if (addLinkBtn) {
+					addLinkBtn.addEventListener('click', () => addLinkField());
+				}
+			});
+
+			// ========== CATEGORY SYSTEM ==========
+
+			// Map Google Place types to categories
+			const TYPE_TO_CATEGORY = {
+				// Culture & Museums
+				'art_gallery': 'culture_museum',
+				'museum': 'culture_museum',
+				'cultural_center': 'culture_museum',
+				'historical_place': 'culture_museum',
+				'historical_landmark': 'culture_museum',
+				'cultural_landmark': 'culture_museum',
+				'monument': 'culture_museum',
+				'zoo': 'culture_museum',
+				'aquarium': 'culture_museum',
+
+				// Entertainment & Attractions
+				'movie_theater': 'entertainment',
+				'movie_rental': 'entertainment',
+				'video_arcade': 'entertainment',
+				'amusement_center': 'entertainment',
+				'amusement_park': 'entertainment',
+				'water_park': 'entertainment',
+				'roller_coaster': 'entertainment',
+				'community_center': 'entertainment',
+				'event_venue': 'entertainment',
+				'convention_center': 'entertainment',
+				'banquet_hall': 'entertainment',
+				'wedding_venue': 'entertainment',
+				'visitor_center': 'entertainment',
+				'plaza': 'entertainment',
+				'marina': 'entertainment',
+				'tourist_attraction': 'entertainment',
+
+				// Parks & Outdoors
+				'park': 'outdoors',
+				'national_park': 'outdoors',
+				'state_park': 'outdoors',
+				'botanical_garden': 'outdoors',
+				'garden': 'outdoors',
+				'dog_park': 'outdoors',
+				'playground': 'outdoors',
+				'hiking_area': 'outdoors',
+				'wildlife_park': 'outdoors',
+				'wildlife_refuge': 'outdoors',
+				'beach': 'outdoors',
+
+				// Food & Drink
+				'bar_and_grill': 'food_drink',
+				'barbecue_restaurant': 'food_drink',
+				'breakfast_restaurant': 'food_drink',
+				'brunch_restaurant': 'food_drink',
+				'buffet_restaurant': 'food_drink',
+				'deli': 'food_drink',
+				'diner': 'food_drink',
+				'food_court': 'food_drink',
+
+				// Coffee & Tea
+				'cafe': 'coffee_tea',
+				'coffee_shop': 'coffee_tea',
+				'tea_house': 'coffee_tea',
+				'acai_shop': 'coffee_tea',
+				'juice_shop': 'coffee_tea',
+				'cat_cafe': 'coffee_tea',
+				'dog_cafe': 'coffee_tea',
+
+				// Desserts
+				'bakery': 'dessert',
+				'ice_cream_shop': 'dessert',
+				'dessert_shop': 'dessert',
+				'candy_store': 'dessert',
+				'donut_shop': 'dessert',
+
+				// Nightlife
+				'bar': 'nightlife',
+				'pub': 'nightlife',
+				'wine_bar': 'nightlife',
+				'night_club': 'nightlife',
+				'karaoke': 'nightlife',
+				'comedy_club': 'nightlife',
+
+				// Shopping
+				'shopping_mall': 'shopping',
+				'market': 'shopping',
+				'supermarket': 'shopping',
+				'grocery_store': 'shopping',
+				'convenience_store': 'shopping',
+				'department_store': 'shopping',
+				'discount_store': 'shopping',
+				'warehouse_store': 'shopping',
+				'store': 'shopping',
+				'clothing_store': 'shopping',
+				'shoe_store': 'shopping',
+				'book_store': 'shopping',
+				'electronics_store': 'shopping',
+				'furniture_store': 'shopping',
+				'gift_shop': 'shopping',
+				'home_goods_store': 'shopping',
+				'home_improvement_store': 'shopping',
+				'hardware_store': 'shopping',
+				'liquor_store': 'shopping',
+				'pet_store': 'shopping',
+				'sporting_goods_store': 'shopping',
+				'bicycle_store': 'shopping',
+				'auto_parts_store': 'shopping',
+				'asian_grocery_store': 'shopping',
+				'butcher_shop': 'shopping',
+				'cell_phone_store': 'shopping',
+
+				// Lodging
+				'hotel': 'lodging',
+				'motel': 'lodging',
+				'hostel': 'lodging',
+				'bed_and_breakfast': 'lodging',
+				'guest_house': 'lodging',
+				'inn': 'lodging',
+				'resort_hotel': 'lodging',
+				'extended_stay_hotel': 'lodging',
+				'campground': 'lodging',
+				'camping_cabin': 'lodging',
+				'farmstay': 'lodging',
+				'rv_park': 'lodging',
+				'cottage': 'lodging',
+				'lodging': 'lodging',
+
+				// Sports & Fitness
+				'gym': 'sports_fitness',
+				'fitness_center': 'sports_fitness',
+				'sports_club': 'sports_fitness',
+				'sports_complex': 'sports_fitness',
+				'arena': 'sports_fitness',
+				'stadium': 'sports_fitness',
+				'athletic_field': 'sports_fitness',
+				'swimming_pool': 'sports_fitness',
+				'ski_resort': 'sports_fitness',
+				'golf_course': 'sports_fitness',
+				'ice_skating_rink': 'sports_fitness',
+				'sports_activity_location': 'sports_fitness',
+				'sports_coaching': 'sports_fitness',
+				'cycling_park': 'sports_fitness',
+				'skateboard_park': 'sports_fitness',
+
+				// Education
+				'library': 'education',
+				'university': 'education',
+
+				// Transport
+				'airport': 'transport',
+				'international_airport': 'transport',
+				'airstrip': 'transport',
+				'train_station': 'transport',
+				'subway_station': 'transport',
+				'bus_station': 'transport',
+				'bus_stop': 'transport',
+				'transit_station': 'transport',
+				'transit_depot': 'transport',
+				'ferry_terminal': 'transport',
+				'park_and_ride': 'transport',
+				'taxi_stand': 'transport',
+				'truck_stop': 'transport',
+
+				// Health & Wellness
+				'hospital': 'health',
+				'doctor': 'health',
+				'dental_clinic': 'health',
+				'dentist': 'health',
+				'pharmacy': 'health',
+				'drugstore': 'health',
+				'spa': 'health',
+				'wellness_center': 'health',
+				'massage': 'health',
+				'yoga_studio': 'health',
+				'sauna': 'health',
+				'skin_care_clinic': 'health',
+				'tanning_studio': 'health',
+				'physiotherapist': 'health',
+				'chiropractor': 'health',
+
+				// Services
+				'hair_salon': 'services',
+				'hair_care': 'services',
+				'barber_shop': 'services',
+				'laundry': 'services',
+				'tour_agency': 'services',
+				'tourist_information_center': 'services',
+				'travel_agency': 'services',
+				'funeral_home': 'services',
+				'storage': 'services',
+				'cemetery': 'services',
+
+				// Work
+				'corporate_office': 'work_office'
+			};
+
+			// Category metadata with reordered priorities (culture/museums first)
+			const CATEGORY_META = {
+				culture_museum: { id: 'culture_museum', label: 'Museums & Culture', weight: 10 },
+				entertainment: { id: 'entertainment', label: 'Entertainment & Attractions', weight: 20 },
+				outdoors: { id: 'outdoors', label: 'Parks & Outdoors', weight: 30 },
+				food_drink: { id: 'food_drink', label: 'Food & Drink', weight: 40 },
+				coffee_tea: { id: 'coffee_tea', label: 'Coffee & Tea', weight: 50 },
+				dessert: { id: 'dessert', label: 'Desserts & Bakeries', weight: 60 },
+				nightlife: { id: 'nightlife', label: 'Nightlife', weight: 70 },
+				shopping: { id: 'shopping', label: 'Shopping', weight: 80 },
+				lodging: { id: 'lodging', label: 'Hotels & Stays', weight: 90 },
+				sports_fitness: { id: 'sports_fitness', label: 'Sports & Fitness', weight: 100 },
+				education: { id: 'education', label: 'Education', weight: 110 },
+				transport: { id: 'transport', label: 'Transport Hubs', weight: 120 },
+				health: { id: 'health', label: 'Health & Wellness', weight: 130 },
+				services: { id: 'services', label: 'Services', weight: 140 },
+				work_office: { id: 'work_office', label: 'Offices & Work', weight: 150 },
+				other: { id: 'other', label: 'Other', weight: 999 }
+			};
+
+			function getCheckinCategory(primaryType) {
+				if (!primaryType) return 'other';
+				if (primaryType === 'restaurant' || primaryType.endsWith('_restaurant')) {
+					return 'food_drink';
+				}
+				return TYPE_TO_CATEGORY[primaryType] || 'other';
+			}
+
+			function categorizePlaces(places) {
+				const categorizedPlaces = {};
+				places.forEach(place => {
+					const primaryType = place.types && place.types[0] ? place.types[0] : null;
+					const category = getCheckinCategory(primaryType);
+
 					if (!categorizedPlaces[category]) {
 						categorizedPlaces[category] = [];
 					}
 					categorizedPlaces[category].push(place);
+				});
+
+				// Sort by weight
+				return Object.keys(categorizedPlaces).sort((a, b) => {
+					return CATEGORY_META[a].weight - CATEGORY_META[b].weight;
+				}).reduce((sorted, key) => {
+					sorted[key] = categorizedPlaces[key];
+					return sorted;
+				}, {});
+			}
+
+			// ========== LOCATION AND PLACES ==========
+
+			let selectedPlace = null;
+			let userCoords = null;
+			const LOCATION_STORAGE_KEY = 'chatter_last_location';
+			const SIGNIFICANT_DISTANCE = 0.01; // ~1km in degrees
+
+			function getDistance(lat1, lng1, lat2, lng2) {
+				const dLat = lat2 - lat1;
+				const dLng = lng2 - lng1;
+				return Math.sqrt(dLat * dLat + dLng * dLng);
+			}
+
+			function storeCoordinates(lat, lng) {
+				localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify({
+					lat,
+					lng,
+					timestamp: Date.now()
+				}));
+			}
+
+			function getStoredCoordinates() {
+				const stored = localStorage.getItem(LOCATION_STORAGE_KEY);
+				return stored ? JSON.parse(stored) : null;
+			}
+
+			function hasLocationChanged(newLat, newLng) {
+				const stored = getStoredCoordinates();
+				if (!stored) return true;
+
+				const distance = getDistance(stored.lat, stored.lng, newLat, newLng);
+				return distance > SIGNIFICANT_DISTANCE;
+			}
+
+			async function requestLocation() {
+				try {
+					document.getElementById('status').textContent = 'Requesting location...';
+					document.getElementById('error').textContent = '';
+
+					if (!navigator.geolocation) {
+						document.getElementById('error').textContent = 'Geolocation not supported';
+						return;
+					}
+
+					navigator.geolocation.getCurrentPosition(
+						async (position) => {
+							const newLat = position.coords.latitude;
+							const newLng = position.coords.longitude;
+
+							userCoords = {
+								lat: newLat,
+								lng: newLng
+							};
+
+							if (hasLocationChanged(newLat, newLng)) {
+								document.getElementById('status').textContent = 'Location changed, updating places...';
+							}
+
+							storeCoordinates(newLat, newLng);
+							await loadPlaces(userCoords.lat, userCoords.lng);
+						},
+						(error) => {
+							let errorMsg = 'Location error: ' + error.message;
+							if (error.code === 1) {
+								errorMsg += ' (PERMISSION_DENIED)';
+							} else if (error.code === 2) {
+								errorMsg += ' (POSITION_UNAVAILABLE)';
+							} else if (error.code === 3) {
+								errorMsg += ' (TIMEOUT)';
+							}
+
+							document.getElementById('error').textContent = errorMsg;
+							document.getElementById('status').textContent = '';
+						},
+						{
+							enableHighAccuracy: true,
+							timeout: 10000,
+							maximumAge: 0
+						}
+					);
+
+				} catch (e) {
+					document.getElementById('error').textContent = 'Exception: ' + e.message;
+				}
+			}
+
+			// Location button handler
+			document.addEventListener('DOMContentLoaded', function() {
+				const locationBtn = document.getElementById('location-btn');
+				if (locationBtn) {
+					locationBtn.addEventListener('click', requestLocation);
 				}
 			});
 
-			return Object.keys(categorizedPlaces).sort((a, b) => {
-				return CATEGORY_META[a].weight - CATEGORY_META[b].weight;
-			}).reduce((sorted, key) => {
-				sorted[key] = categorizedPlaces[key];
-				return sorted;
-			}, {});
-		}
+			async function loadPlaces(lat, lng) {
+				document.getElementById('status').textContent = 'Finding nearby places...';
 
-		function buildPlacesHTML(sortedCategorizedPlaces, geocodeData) {
-			let html = '<h2>Select a place:</h2>';
-			const filteredPlacesFlat = [];
+				try {
+					const placesUrl = \`/api/admin/places/nearby?lat=\${lat}&lng=\${lng}&radius=500\`;
+					const placesResponse = await fetch(placesUrl);
+					const placesData = await placesResponse.json();
 
-			html += '<ul>';
-			html += \`<li style="padding: 5px; margin-bottom: 10px;">
-				<button type="button" onclick="selectPlace(null, '\${geocodeData.formatted}')">
-					\${geocodeData.formatted}
-				</button>
-			</li>\`;
-			html += '</ul>';
+					const geocodeUrl = \`/api/admin/geocode/reverse?lat=\${lat}&lng=\${lng}\`;
+					const geocodeResponse = await fetch(geocodeUrl);
+					const geocodeData = await geocodeResponse.json();
 
-			const categories = Object.keys(sortedCategorizedPlaces);
-			if (categories.length === 0) {
-				html += '<p><em>No places match the selected categories. Try enabling more filters above.</em></p>';
-			} else {
-				categories.forEach(categoryId => {
-					const categoryPlaces = sortedCategorizedPlaces[categoryId];
+					displayPlaces(placesData.results || [], geocodeData);
+
+					document.getElementById('location-btn').textContent = 'Update Places';
+				} catch (error) {
+					document.getElementById('error').textContent = 'Failed to load places: ' + error.message;
+					document.getElementById('status').textContent = '';
+				}
+			}
+
+			function displayPlaces(places, geocodeData) {
+				const placesDiv = document.getElementById('places');
+
+				if (!places || places.length === 0) {
+					placesDiv.innerHTML = '<p style="font-size: 52px;">No nearby places found</p>';
+					document.getElementById('status').textContent = '';
+					return;
+				}
+
+				// Store data globally for selection
+				window.placesData = places;
+				window.geocodeData = geocodeData;
+
+				// Categorize places
+				const categorized = categorizePlaces(places);
+
+				// Build HTML with wa-radio-group
+				let html = '<h2 style="font-size: 52px;">Select a place:</h2>';
+				html += '<wa-radio-group id="place-radio-group" size="large">';
+
+				// First option: City/State
+				html += \`<wa-radio appearance="button" value="citystate"><span style="font-size: 52px;">\${escapeHtml(geocodeData.formatted)}</span></wa-radio>\`;
+
+				// Display places grouped by category
+				Object.keys(categorized).forEach(categoryId => {
+					const categoryPlaces = categorized[categoryId];
+					const categoryLabel = CATEGORY_META[categoryId].label;
+
+					// Category heading
+					html += \`<div style="margin-top: 20px; margin-bottom: 12px;"><strong style="font-size: 52px;">\${categoryLabel} (\${categoryPlaces.length})</strong></div>\`;
+
+					// Sort places alphabetically within category
 					categoryPlaces.sort((a, b) => a.name.localeCompare(b.name));
 
-					html += \`<h3 style="margin-top: 20px; color: #333;">\${CATEGORY_META[categoryId].label} (\${categoryPlaces.length})</h3>\`;
-					html += '<ul>';
-
+					// Display each place (name only, no address)
 					categoryPlaces.forEach((place) => {
-						const placeIndex = filteredPlacesFlat.length;
-						filteredPlacesFlat.push(place);
-
-						html += \`<li>
-							<button type="button" onclick="selectPlaceByIndex(\${placeIndex})">
-								\${place.name}\${place.address ? ' - ' + place.address : ''}
-							</button>
-						</li>\`;
+						html += \`<wa-radio appearance="button" value="place-\${escapeHtml(place.placeId)}"><span style="font-size: 52px;">\${escapeHtml(place.name)}</span></wa-radio>\`;
 					});
-
-					html += '</ul>';
 				});
+
+				// Last option: No location
+				html += \`<div style="margin-top: 16px;"></div>\`;
+				html += \`<wa-radio appearance="button" value="none"><span style="font-size: 52px;">Submit without location</span></wa-radio>\`;
+
+				html += '</wa-radio-group>';
+
+				placesDiv.innerHTML = html;
+
+				// Auto-select city/state option
+				const radioGroup = document.getElementById('place-radio-group');
+				if (radioGroup) {
+					radioGroup.value = 'citystate';
+					radioGroup.addEventListener('change', handlePlaceSelection);
+				}
+
+				// Update selected place
+				selectPlace(null, geocodeData.formatted);
 			}
 
-			html += '<ul style="margin-top: 20px;">';
-			html += '<li><button type="button" onclick="selectPlace(-1, null)">Submit without location</button></li>';
-			html += '</ul>';
-
-			return { html, filteredPlacesFlat };
-		}
-
-		function displayPlaces(places, geocodeData) {
-			const placesDiv = document.getElementById('places');
-
-			if (!places || places.length === 0) {
-				placesDiv.innerHTML = '<p>No nearby places found</p>';
-				document.getElementById('status').textContent = '';
-				return;
+			function escapeHtml(str) {
+				const div = document.createElement('div');
+				div.textContent = str;
+				return div.innerHTML;
 			}
 
-			const sortedCategorizedPlaces = categorizePlaces(places);
-			const { html, filteredPlacesFlat } = buildPlacesHTML(sortedCategorizedPlaces, geocodeData);
+			function handlePlaceSelection(event) {
+				const value = event.target.value;
 
-			placesDiv.innerHTML = html;
-
-			window.placesData = places;
-			window.filteredPlaces = filteredPlacesFlat;
-			window.geocodeData = geocodeData;
-
-			selectPlace(null, geocodeData.formatted);
-		}
-
-		function selectPlaceByIndex(index) {
-			// Get place from the filtered places array
-			const place = window.filteredPlaces[index];
-			if (!place) {
-				return;
+				if (value === 'citystate') {
+					// City/State option
+					selectPlace(null, window.geocodeData.formatted);
+				} else if (value === 'none') {
+					// No location
+					selectPlace(-1, null);
+				} else if (value.startsWith('place-')) {
+					// Specific place - find by placeId
+					const placeId = value.substring(6); // Remove 'place-' prefix
+					const place = window.placesData.find(p => p.placeId === placeId);
+					if (place) {
+						selectedPlace = {
+							type: 'place',
+							name: place.name,
+							address: place.address || '',
+							location: {
+								lat: place.lat,
+								lng: place.lng
+							},
+							placeId: place.placeId
+						};
+						document.getElementById('status').textContent = 'Selected: ' + selectedPlace.name;
+					}
+				}
 			}
 
-			// Set selected place
-			selectedPlace = {
-				type: 'place',
-				name: place.name,
-				address: place.address || '',
-				location: {
-					lat: place.lat,
-					lng: place.lng
-				},
-				placeId: place.placeId
-			};
-
-			document.getElementById('status').textContent = 'Selected: ' + selectedPlace.name;
-		}
-
-		function selectPlace(index, cityState) {
-			if (index === -1) {
-				// No location
-				selectedPlace = null;
-			} else if (index === null) {
-				// City, State option
-				selectedPlace = {
-					type: 'citystate',
-					name: cityState,
-					location: userCoords
-				};
-			} else {
-				// Specific place
+			function selectPlaceByIndex(index) {
 				const place = window.placesData[index];
+				if (!place) {
+					return;
+				}
+
 				selectedPlace = {
 					type: 'place',
 					name: place.name,
@@ -720,139 +701,175 @@ export function handleAdminChatterNew(c: Context<{ Bindings: Env }>) {
 					},
 					placeId: place.placeId
 				};
+
+				document.getElementById('status').textContent = 'Selected: ' + selectedPlace.name;
 			}
 
-			document.getElementById('status').textContent = 'Selected: ' + (selectedPlace ? selectedPlace.name : 'No location');
-		}
-
-		async function submitForm(e) {
-			e.preventDefault();
-
-			const title = document.getElementById('title').value.trim();
-			const content = document.getElementById('content').value.trim();
-			const comment = document.getElementById('comment').value.trim();
-			const links = getLinks();
-
-			document.getElementById('error').textContent = '';
-
-			// Upload images first if any are selected
-			let imageUrls = [];
-			const fileInput = document.getElementById('image-files');
-			if (fileInput.files && fileInput.files.length > 0) {
-				try {
-					imageUrls = await uploadImages(Array.from(fileInput.files));
-				} catch (error) {
-					// Image upload failed - abort everything
-					document.getElementById('error').textContent = error.message;
-					document.getElementById('status').textContent = '';
-					return; // Don't create the chatter
-				}
-			}
-
-			const payload = {
-				kind: 'chatter',
-				publish: true
-			};
-
-			if (title) payload.title = title;
-			if (content) payload.content = content;
-			if (comment) payload.comment = comment;
-			if (links.length > 0) payload.links = links;
-			if (imageUrls.length > 0) payload.images = imageUrls;
-
-			if (selectedPlace) {
-				payload.location_hint = {
-					lat: selectedPlace.location.lat,
-					lng: selectedPlace.location.lng,
-					accuracy_m: 50
-				};
-
-				if (selectedPlace.type === 'place') {
-					payload.place = {
-						name: selectedPlace.name,
-						formatted_address: selectedPlace.address,
-						short_address: selectedPlace.address,
+			function selectPlace(index, cityState) {
+				if (index === -1) {
+					// No location
+					selectedPlace = null;
+				} else if (index === null) {
+					// City, State option
+					selectedPlace = {
+						type: 'citystate',
+						name: cityState,
+						location: userCoords
+					};
+				} else {
+					// Specific place
+					const place = window.placesData[index];
+					selectedPlace = {
+						type: 'place',
+						name: place.name,
+						address: place.address || '',
 						location: {
-							lat: selectedPlace.location.lat,
-							lng: selectedPlace.location.lng
+							lat: place.lat,
+							lng: place.lng
 						},
-						provider_ids: {
-							google_places: selectedPlace.placeId
-						}
+						placeId: place.placeId
 					};
 				}
+
+				document.getElementById('status').textContent = 'Selected: ' + (selectedPlace ? selectedPlace.name : 'No location');
 			}
 
-			document.getElementById('status').textContent = 'Creating chatter...';
+			// ========== FORM SUBMISSION ==========
 
-			try {
-				const response = await fetch('/api/admin/chatter', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify(payload)
-				});
+			async function submitForm(e) {
+				e.preventDefault();
 
-				if (!response.ok) {
-					throw new Error(\`HTTP error \${response.status}\`);
+				const content = document.getElementById('content').value.trim();
+				const links = getLinks();
+
+				document.getElementById('error').textContent = '';
+
+				// Upload images first if any are selected
+				let imageUrls = [];
+				const fileInput = document.getElementById('image-files');
+				if (fileInput.files && fileInput.files.length > 0) {
+					try {
+						imageUrls = await uploadImages(Array.from(fileInput.files));
+					} catch (error) {
+						document.getElementById('error').textContent = error.message;
+						document.getElementById('status').textContent = '';
+						return;
+					}
 				}
 
-				const result = await response.json();
+				const payload = {
+					kind: 'chatter',
+					publish: true
+				};
 
-				document.getElementById('status').textContent = 'Chatter created successfully!';
-				document.getElementById('form').reset();
+				if (content) payload.content = content;
+				if (links.length > 0) payload.links = links;
+				if (imageUrls.length > 0) payload.images = imageUrls;
 
-				// Clear image previews
-				selectedImages = [];
-				document.getElementById('image-preview-container').innerHTML = '';
-			} catch (error) {
-				document.getElementById('error').textContent = 'Failed to create chatter: ' + error.message;
-				document.getElementById('status').textContent = '';
-			}
-		}
+				// Add location if selected
+				if (selectedPlace) {
+					payload.location_hint = {
+						lat: selectedPlace.location.lat,
+						lng: selectedPlace.location.lng,
+						accuracy_m: 50
+					};
 
-		// Initialize on page load
-		async function initializePage() {
-			// Parse and prepopulate from URL parameters
-			parseURLParams();
+					if (selectedPlace.type === 'place') {
+						payload.place = {
+							name: selectedPlace.name,
+							formatted_address: selectedPlace.address,
+							short_address: selectedPlace.address,
+							location: {
+								lat: selectedPlace.location.lat,
+								lng: selectedPlace.location.lng
+							},
+							provider_ids: {
+								google_places: selectedPlace.placeId
+							}
+						};
+					}
+				}
 
-			// Check if geolocation is supported
-			if (!navigator.geolocation) {
-				document.getElementById('status').textContent = 'Geolocation not supported';
-				return;
-			}
+				document.getElementById('status').textContent = 'Creating chatter...';
 
-			// Check if we can query permissions
-			if (!navigator.permissions) {
-				// Permissions API not available, keep default behavior
-				document.getElementById('status').textContent = '';
-				return;
-			}
+				try {
+					const response = await fetch('/api/admin/chatter', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify(payload)
+					});
 
-			try {
-				// Check if location permission is already granted
-				const permission = await navigator.permissions.query({ name: 'geolocation' });
+					if (!response.ok) {
+						throw new Error(\`HTTP error \${response.status}\`);
+					}
 
-				if (permission.state === 'granted') {
-					// Permission already granted, auto-request location
-					document.getElementById('status').textContent = 'Checking location...';
-					await requestLocation();
-				} else {
-					// Permission not granted yet
+					const result = await response.json();
+
+					document.getElementById('status').textContent = 'Chatter created successfully!';
+					document.getElementById('form').reset();
+
+					// Clear image previews
+					selectedImages = [];
+					document.getElementById('image-preview-container').innerHTML = '';
+
+					// Clear links
+					document.getElementById('links-container').innerHTML = '';
+					linkCount = 0;
+				} catch (error) {
+					document.getElementById('error').textContent = 'Failed to create chatter: ' + error.message;
 					document.getElementById('status').textContent = '';
 				}
-			} catch (error) {
-				// Permissions query failed, keep default behavior
-				document.getElementById('status').textContent = '';
 			}
-		}
 
-		// Run initialization when page loads
-		initializePage();
-	</script>
-</body>
-</html>`;
+			// Form submit handler
+			document.addEventListener('DOMContentLoaded', function() {
+				const form = document.getElementById('form');
+				if (form) {
+					form.addEventListener('submit', submitForm);
+				}
+			});
+
+			// ========== INITIALIZATION ==========
+
+			async function initializePage() {
+				parseURLParams();
+
+				if (!navigator.geolocation) {
+					document.getElementById('status').textContent = 'Geolocation not supported';
+					return;
+				}
+
+				if (!navigator.permissions) {
+					document.getElementById('status').textContent = '';
+					return;
+				}
+
+				try {
+					const permission = await navigator.permissions.query({ name: 'geolocation' });
+
+					if (permission.state === 'granted') {
+						document.getElementById('status').textContent = 'Checking location...';
+						await requestLocation();
+					} else {
+						document.getElementById('status').textContent = '';
+					}
+				} catch (error) {
+					document.getElementById('status').textContent = '';
+				}
+			}
+
+			initializePage();
+		</script>
+	`;
+
+	const html = renderPage({
+		title: "New Chatter - Admin",
+		description: "Create a new chatter entry",
+		body,
+		version: c.env.VERSION,
+	});
 
 	return c.html(html);
 }

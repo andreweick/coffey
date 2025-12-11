@@ -11,8 +11,9 @@ export function renderNav(): string {
 	`;
 }
 
-export function renderFooter(): string {
+export function renderFooter(version?: string): string {
 	const year = new Date().getFullYear();
+	const versionDisplay = version ? `<span class="wa-color-text-quiet wa-body-s"> • Version: ${version}</span>` : '';
 	return `
 		<div class="wa-stack wa-gap-l">
 			<div class="wa-grid wa-gap-xl">
@@ -27,7 +28,7 @@ export function renderFooter(): string {
 			</div>
 			<wa-divider></wa-divider>
 			<div class="wa-cluster wa-gap-m wa-align-items-center">
-				<span class="wa-color-text-quiet wa-body-s">&copy; ${year} Coffey</span>
+				<span class="wa-color-text-quiet wa-body-s">&copy; ${year} Coffey</span>${versionDisplay}
 			</div>
 		</div>
 	`;
