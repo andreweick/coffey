@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>jub0bs.com :: Mimic Layout</title>
+	<script src="https://kit.webawesome.com/d1309049507a45d3.js" crossorigin="anonymous"></script>
+	<style>
+		/* Required reset for wa-page */
+		html, body {
+			min-height: 100%;
+			height: 100%;
+			padding: 0;
+			margin: 0;
+		}
+	</style>
+</head>
+<body>
+	<wa-page mobile-breakpoint="768">
+		<!-- Header with site title and navigation -->
+		<header slot="header">
+			<div class="wa-cluster" style="justify-content: space-between; align-items: center;">
+				<a href="/" class="wa-link-plain">
+					<strong class="wa-heading-m">jub0bs.com</strong>
+				</a>
+				<nav class="wa-cluster wa-gap-l">
+					<a href="/posts" class="wa-link-plain wa-body-m">Posts</a>
+					<a href="/talks" class="wa-link-plain wa-body-m">Talks</a>
+					<a href="/about" class="wa-link-plain wa-body-m">About</a>
+				</nav>
+			</div>
+		</header>
+
+		<!-- Main content area - single column blog post -->
+		<main>
+			<article class="wa-stack wa-gap-xl" style="max-width: 720px; margin: 0 auto;">
+				<!-- Article header -->
+				<header class="wa-stack wa-gap-m">
+					<h1 class="wa-heading-2xl">Pure vs. impure iterators in Go</h1>
+					<div class="wa-cluster wa-gap-m wa-color-text-quiet wa-body-s">
+						<span>2025-05-29</span>
+						<span>•</span>
+						<span>8 min read</span>
+						<span>•</span>
+						<a href="/tags/go" class="wa-link-plain wa-color-text-quiet">Go</a>
+						<a href="/tags/iterators" class="wa-link-plain wa-color-text-quiet">iterators</a>
+					</div>
+				</header>
+
+				<wa-divider></wa-divider>
+
+				<!-- Article content -->
+				<section class="wa-stack wa-gap-l">
+					<p class="wa-body-l">
+						Iterators were introduced in Go 1.23. The distinction between pure and impure
+						iterators is fundamental to understanding how to use them effectively in your code.
+					</p>
+
+					<h2 class="wa-heading-l">Introduction</h2>
+					<p class="wa-body-m">
+						An iterator in Go is a function that yields successive elements of a sequence.
+						The iterator package in Go's standard library provides tools for working with
+						these sequences in a composable way.
+					</p>
+
+					<h2 class="wa-heading-l">What makes an iterator pure?</h2>
+					<p class="wa-body-m">
+						A pure iterator is one that produces the same sequence of values every time
+						it's called, regardless of when or how many times you iterate over it.
+						This property makes pure iterators predictable and easy to reason about.
+					</p>
+
+					<wa-card>
+						<div slot="header" class="wa-body-s wa-color-text-quiet">Example: A pure iterator</div>
+						<pre class="wa-body-s"><code>func Range(n int) iter.Seq[int] {
+    return func(yield func(int) bool) {
+        for i := range n {
+            if !yield(i) {
+                return
+            }
+        }
+    }
+}</code></pre>
+					</wa-card>
+
+					<h2 class="wa-heading-l">Impure iterators</h2>
+					<p class="wa-body-m">
+						In contrast, an impure iterator may produce different values on subsequent
+						iterations. This can happen when the iterator reads from an external source
+						like a file, network connection, or channel.
+					</p>
+
+					<wa-card>
+						<div slot="header" class="wa-body-s wa-color-text-quiet">Example: An impure iterator</div>
+						<pre class="wa-body-s"><code>func Lines(r io.Reader) iter.Seq[string] {
+    scanner := bufio.NewScanner(r)
+    return func(yield func(string) bool) {
+        for scanner.Scan() {
+            if !yield(scanner.Text()) {
+                return
+            }
+        }
+    }
+}</code></pre>
+					</wa-card>
+
+					<h2 class="wa-heading-l">Why does it matter?</h2>
+					<p class="wa-body-m">
+						Understanding this distinction helps you write correct and efficient code.
+						With a pure iterator, you can safely iterate multiple times. With an impure
+						iterator, you typically get only one shot at reading the values.
+					</p>
+
+					<div class="wa-stack wa-gap-s">
+						<p class="wa-body-m"><strong>Key takeaways:</strong></p>
+						<ul class="wa-body-m wa-stack wa-gap-xs">
+							<li>Pure iterators are deterministic and reusable</li>
+							<li>Impure iterators may consume their source</li>
+							<li>Document your iterators' purity for API consumers</li>
+							<li>Consider wrapping impure iterators with caching if reuse is needed</li>
+						</ul>
+					</div>
+
+					<h2 class="wa-heading-l">Conclusion</h2>
+					<p class="wa-body-m">
+						The pure vs. impure distinction is a key concept for Go developers working
+						with the new iterator APIs. By being mindful of this property, you can write
+						more robust and maintainable code.
+					</p>
+				</section>
+
+				<wa-divider></wa-divider>
+
+				<!-- Article footer / navigation -->
+				<nav class="wa-cluster" style="justify-content: space-between;">
+					<a href="/posts/previous" class="wa-link-plain wa-body-s">
+						<wa-icon name="arrow-left"></wa-icon>
+						Previous post
+					</a>
+					<a href="/posts/next" class="wa-link-plain wa-body-s">
+						Next post
+						<wa-icon name="arrow-right"></wa-icon>
+					</a>
+				</nav>
+			</article>
+		</main>
+
+		<!-- Footer -->
+		<footer slot="footer">
+			<div class="wa-stack wa-gap-m" style="max-width: 720px; margin: 0 auto;">
+				<wa-divider></wa-divider>
+				<div class="wa-cluster" style="justify-content: space-between; align-items: center;">
+					<span class="wa-body-s wa-color-text-quiet">
+						&copy; 2025 jub0bs.com
+					</span>
+					<nav class="wa-cluster wa-gap-m">
+						<a href="https://github.com/jub0bs" class="wa-link-plain wa-body-s wa-color-text-quiet">
+							<wa-icon name="github"></wa-icon>
+						</a>
+						<a href="https://twitter.com/jub0bs" class="wa-link-plain wa-body-s wa-color-text-quiet">
+							<wa-icon name="twitter"></wa-icon>
+						</a>
+						<a href="/rss.xml" class="wa-link-plain wa-body-s wa-color-text-quiet">
+							<wa-icon name="rss"></wa-icon>
+						</a>
+					</nav>
+				</div>
+			</div>
+		</footer>
+	</wa-page>
+</body>
+</html>
