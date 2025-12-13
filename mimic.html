@@ -17,19 +17,25 @@
 </head>
 <body>
 	<wa-page mobile-breakpoint="768">
-		<!-- Header with site title and navigation -->
+		<!-- Header with site title and mobile toggle -->
 		<header slot="header">
-			<div class="wa-cluster" style="justify-content: space-between; align-items: center;">
-				<a href="/" class="wa-link-plain">
-					<strong class="wa-heading-m">jub0bs.com</strong>
-				</a>
-				<nav class="wa-cluster wa-gap-l">
-					<a href="/posts" class="wa-link-plain wa-body-m">Posts</a>
-					<a href="/talks" class="wa-link-plain wa-body-m">Talks</a>
-					<a href="/about" class="wa-link-plain wa-body-m">About</a>
-				</nav>
-			</div>
+			<a href="/" class="wa-link-plain">
+				<strong class="wa-heading-m">jub0bs.com</strong>
+			</a>
+			<!-- Desktop navigation - hidden on mobile -->
+			<nav class="wa-cluster wa-gap-l wa-desktop-only">
+				<a href="/posts" class="wa-link-plain wa-body-m">Posts</a>
+				<a href="/talks" class="wa-link-plain wa-body-m">Talks</a>
+				<a href="/about" class="wa-link-plain wa-body-m">About</a>
+			</nav>
 		</header>
+
+		<!-- Mobile navigation drawer - uses navigation-header slot -->
+		<nav slot="navigation-header" class="wa-stack wa-gap-m">
+			<a href="/posts" class="wa-link-plain wa-body-l">Posts</a>
+			<a href="/talks" class="wa-link-plain wa-body-l">Talks</a>
+			<a href="/about" class="wa-link-plain wa-body-l">About</a>
+		</nav>
 
 		<!-- Main content area - single column blog post -->
 		<main>
