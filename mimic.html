@@ -28,6 +28,18 @@
 				<a href="/talks" class="wa-link-plain wa-body-m">Talks</a>
 				<a href="/about" class="wa-link-plain wa-body-m">About</a>
 			</nav>
+			<!-- Font size and theme controls -->
+			<div class="wa-cluster wa-gap-xs">
+				<wa-button size="small" variant="neutral" id="font-decrease">
+					<wa-icon name="minus" label="Decrease font size"></wa-icon>
+				</wa-button>
+				<wa-button size="small" variant="neutral" id="font-increase">
+					<wa-icon name="plus" label="Increase font size"></wa-icon>
+				</wa-button>
+				<wa-button size="small" variant="neutral" id="theme-toggle">
+					<wa-icon name="sun" label="Toggle theme" id="theme-icon"></wa-icon>
+				</wa-button>
+			</div>
 		</header>
 
 		<!-- Mobile navigation drawer - uses navigation-header slot -->
@@ -174,5 +186,38 @@
 			</div>
 		</footer>
 	</wa-page>
+
+	<script>
+		// Font size scaling
+		let fontScale = 1;
+		const MIN_SCALE = 0.75;
+		const MAX_SCALE = 1.5;
+		const STEP = 0.125;
+
+		document.getElementById('font-increase').addEventListener('click', () => {
+			if (fontScale < MAX_SCALE) {
+				fontScale += STEP;
+				document.documentElement.style.setProperty('--wa-font-size-scale', fontScale);
+			}
+		});
+
+		document.getElementById('font-decrease').addEventListener('click', () => {
+			if (fontScale > MIN_SCALE) {
+				fontScale -= STEP;
+				document.documentElement.style.setProperty('--wa-font-size-scale', fontScale);
+			}
+		});
+
+		// Theme toggle
+		let isDark = false;
+		const themeToggle = document.getElementById('theme-toggle');
+		const themeIcon = document.getElementById('theme-icon');
+
+		themeToggle.addEventListener('click', () => {
+			isDark = !isDark;
+			document.documentElement.classList.toggle('wa-dark', isDark);
+			themeIcon.name = isDark ? 'moon' : 'sun';
+		});
+	</script>
 </body>
 </html>
