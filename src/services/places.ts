@@ -1,4 +1,5 @@
 import type { NearbyPlace } from "../types/domain";
+import { parseDuration } from "../lib/duration";
 
 interface GooglePlaceResult {
 	id: string;
@@ -99,11 +100,12 @@ export async function fetchNearbyPlaces(
 		types: place.types,
 	}));
 
-	// Cache the results for 3 hours (10800 seconds)
+	// Cache the results for configured duration (default 24 hours)
+	const cacheDurationSeconds = parseDuration(env.PLACES_CACHE_HOURS);
 	const cacheResponse = new Response(JSON.stringify(results), {
 		headers: {
 			"Content-Type": "application/json",
-			"Cache-Control": "public, max-age=10800", // 3 hours
+			"Cache-Control": `public, max-age=${cacheDurationSeconds}`,
 		},
 	});
 	await cache.put(cacheKey, cacheResponse);

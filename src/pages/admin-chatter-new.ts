@@ -48,6 +48,8 @@ export function handleAdminChatterNew(c: Context<{ Bindings: Env }>) {
 
 			// ========== URL PARAMETER PARSING ==========
 
+			let overrideDateTime = null;
+
 			function parseURLParams() {
 				const params = new URLSearchParams(window.location.search);
 
@@ -63,6 +65,25 @@ export function handleAdminChatterNew(c: Context<{ Bindings: Env }>) {
 						addLinkField(url.trim());
 					}
 				});
+
+				// Handle dtg (datetime group) parameter (ISO8601 format)
+				if (params.has('dtg')) {
+					overrideDateTime = params.get('dtg');
+					document.getElementById('status').textContent = 'Using datetime: ' + overrideDateTime;
+				}
+
+				// Handle lat/lng parameters - auto-load places
+				if (params.has('lat') && params.has('lng')) {
+					const lat = parseFloat(params.get('lat'));
+					const lng = parseFloat(params.get('lng'));
+
+					if (!isNaN(lat) && !isNaN(lng)) {
+						userCoords = { lat, lng };
+						document.getElementById('status').textContent = 'Loading places for coordinates...';
+						// Load places immediately
+						loadPlaces(lat, lng);
+					}
+				}
 			}
 
 			// ========== IMAGE MANAGEMENT ==========
@@ -739,7 +760,9 @@ export function handleAdminChatterNew(c: Context<{ Bindings: Env }>) {
 			async function submitForm(e) {
 				e.preventDefault();
 
-				const content = document.getElementById('content').value.trim();
+				// Web Awesome components need special handling for .value
+				const contentElement = document.getElementById('content');
+				const content = (contentElement.value || '').trim();
 				const links = getLinks();
 
 				document.getElementById('error').textContent = '';
@@ -765,6 +788,7 @@ export function handleAdminChatterNew(c: Context<{ Bindings: Env }>) {
 				if (content) payload.content = content;
 				if (links.length > 0) payload.links = links;
 				if (imageUrls.length > 0) payload.images = imageUrls;
+				if (overrideDateTime) payload.created_at = overrideDateTime;
 
 				// Add location if selected
 				if (selectedPlace) {
@@ -791,6 +815,9 @@ export function handleAdminChatterNew(c: Context<{ Bindings: Env }>) {
 				}
 
 				document.getElementById('status').textContent = 'Creating chatter...';
+
+				// Debug: Log what we're sending
+				console.log('Sending payload:', payload);
 
 				try {
 					const response = await fetch('/api/admin/chatter', {
@@ -835,6 +862,11 @@ export function handleAdminChatterNew(c: Context<{ Bindings: Env }>) {
 
 			async function initializePage() {
 				parseURLParams();
+
+				// Skip auto-location if coordinates were provided via URL params
+				if (userCoords) {
+					return;
+				}
 
 				if (!navigator.geolocation) {
 					document.getElementById('status').textContent = 'Geolocation not supported';

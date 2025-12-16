@@ -247,6 +247,36 @@ curl -X POST https://eick.com/api/admin/chatter \
   }'
 ```
 
+### Backdating Posts with created_at
+
+You can override the creation timestamp to backdate posts using the `created_at` field. This is useful for importing old content or backdating entries.
+
+**JSON format (with timezone):**
+```bash
+curl -X POST https://eick.com/api/admin/chatter \
+  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "chatter",
+    "content": "Posted in the past!",
+    "created_at": "2024-12-01T14:30:00-05:00"
+  }'
+```
+
+**Multipart format:**
+```bash
+curl -X POST https://eick.com/api/admin/chatter \
+  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+  -F "kind=chatter" \
+  -F "content=Backdated post from vacation" \
+  -F "created_at=2024-11-15T09:00:00Z" \
+  -F "images=@vacation.jpg"
+```
+
+**Note:** The `created_at` timestamp is also used to fetch historical weather data for that specific time. Weather data within the last 24 hours uses Google's hourly history API, while older dates use Open-Meteo historical data.
+
 ### Upload Image Only
 
 ```bash

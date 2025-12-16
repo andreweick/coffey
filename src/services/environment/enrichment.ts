@@ -11,6 +11,7 @@ import { getErrorMessage } from "../../lib/errors";
 
 /**
  * Helper to assign fulfilled promise results to environment object
+ * Only assigns non-null values (null values are skipped, e.g., future dates for weather)
  */
 function assignIfFulfilled<T>(
 	result: PromiseSettledResult<T>,
@@ -19,8 +20,11 @@ function assignIfFulfilled<T>(
 	errorMessage: string
 ): void {
 	if (result.status === "fulfilled") {
-		// @ts-ignore - We know the value type matches the key
-		environment[key] = result.value;
+		// Only assign if value is not null (null = intentional skip, e.g., future date)
+		if (result.value !== null && result.value !== undefined) {
+			// @ts-ignore - We know the value type matches the key
+			environment[key] = result.value;
+		}
 	} else {
 		console.error(errorMessage, result.reason);
 	}
@@ -114,14 +118,15 @@ export async function enrichChatter(
 		return chatterData;
 	}
 
-	// Get today's date in YYYY-MM-DD format
-	const today = new Date().toISOString().split("T")[0];
+	// Use created_at timestamp if provided, otherwise use current timestamp
+	// Pass full datetime (not just date) to weather API for accurate hourly data
+	const targetDateTime = request.created_at || new Date().toISOString();
 
 	// Fetch all environmental data in parallel
 	// Use Promise.allSettled to handle partial failures gracefully
 	const [weatherResult, airQualityResult, pollenResult, elevationResult, geocodingResult, nearbyPlacesResult] =
 		await Promise.allSettled([
-			fetchWeather(coords.lat, coords.lng, today, env),
+			fetchWeather(coords.lat, coords.lng, targetDateTime, env),
 			fetchAirQuality(coords.lat, coords.lng, env),
 			fetchPollen(coords.lat, coords.lng, env),
 			fetchElevation(coords.lat, coords.lng, env),

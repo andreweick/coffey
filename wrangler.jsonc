@@ -79,7 +79,9 @@
         "CLOUDFLARE_ACCOUNT_ID": "5930846a5870031c415bb26e42e38833",
         "TEAM_DOMAIN": "https://missionfocus.cloudflareaccess.com",
         "POLICY_AUD": "c1767df7053d0046b051677141e5beb353dfec656f6fcea90194f9f599d9fe38",
+        "PLACES_CACHE_HOURS": "72h",
         "VERSION": "{{CF_DEPLOYMENT_ID}}", // Auto-populated by Cloudflare
+        "CRON_ENABLE": false,
       },
       "d1_databases": [
         {
@@ -145,7 +147,9 @@
         "CLOUDFLARE_ACCOUNT_ID": "5930846a5870031c415bb26e42e38833",
         "TEAM_DOMAIN": "https://missionfocus.cloudflareaccess.com",
         "POLICY_AUD": "c1767df7053d0046b051677141e5beb353dfec656f6fcea90194f9f599d9fe38",
+        "PLACES_CACHE_HOURS": "72h",
         "VERSION": "{{CF_DEPLOYMENT_ID}}", // Auto-populated by Cloudflare
+        "CRON_ENABLE": false,
       },
       "d1_databases": [
         {
@@ -155,6 +159,23 @@
           "remote": true,
         },
       ],
+      "queues": {
+        "producers": [
+          {
+            "queue": "bookmark-sync-queue",
+            "binding": "BOOKMARK_SYNC_QUEUE",
+          },
+        ],
+        "consumers": [
+          {
+            "queue": "bookmark-sync-queue",
+            "max_batch_size": 10,
+            "max_batch_timeout": 30,
+            "max_retries": 3,
+            "max_concurrency": 2,
+          },
+        ],
+      },
     },
   },
   "d1_databases": [
@@ -165,6 +186,37 @@
       "remote": true,
     },
   ],
+  /**
+   * Queues
+   * https://developers.cloudflare.com/queues/
+   */
+  "queues": {
+    "producers": [
+      {
+        "queue": "bookmark-sync-queue",
+        "binding": "BOOKMARK_SYNC_QUEUE",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "bookmark-sync-queue",
+        "max_batch_size": 10,
+        "max_batch_timeout": 30,
+        "max_retries": 3,
+        "max_concurrency": 2,
+      },
+    ],
+  },
+  /**
+   * Cron Triggers
+   * https://developers.cloudflare.com/workers/configuration/cron-triggers/
+   */
+  "triggers": {
+    "crons": [
+      // "0 */1 * * *"   // Every 1 hour
+      "*/30 * * * *", // Every 30 minutes
+    ],
+  },
   /**
    * Environment Variables
    * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables

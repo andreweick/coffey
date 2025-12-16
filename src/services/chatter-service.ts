@@ -46,15 +46,15 @@ export async function createChatter(
 	// Compute SHA256 hash of enriched chatter data
 	const hash = await hashJSON(enrichedData);
 
-	// Generate timestamps
-	const now = new Date().toISOString();
+	// Use provided created_at or generate current timestamp
+	const createdAt = request.created_at || new Date().toISOString();
 
 	// Build final Chatter envelope
 	const chatter: Chatter = {
 		type: "chatter",
 		id: `sha256:${hash}`,
 		schema_version: "1.0.0",
-		created_at: now,
+		created_at: createdAt,
 		created_by: "1", // Hardcoded user ID - change when adding authentication
 		data: enrichedData,
 	};

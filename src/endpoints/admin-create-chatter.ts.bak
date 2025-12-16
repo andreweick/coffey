@@ -53,32 +53,16 @@ export class AdminCreateChatterEndpoint extends OpenAPIRoute {
 								.union([z.boolean(), z.string()])
 								.optional()
 								.describe("Publish flag (boolean or 'true'/'false' string)"),
-						created_at: z
-							.string()
-							.optional()
-							.describe("Override creation timestamp (ISO8601 format with timezone)"),
-						location_hint: z
-							.string()
-							.optional()
-							.describe("JSON string of LocationHint object"),
-						lat: z
-							.string()
-							.optional()
-							.describe("Latitude (flat format, alternative to location_hint JSON)"),
-						lng: z
-							.string()
-							.optional()
-							.describe("Longitude (flat format, alternative to location_hint JSON)"),
-						placeId: z
-							.string()
-							.optional()
-							.describe("Google Place ID (flat format, alternative to place JSON)"),
-						place: z
-							.string()
-							.optional()
-							.describe("JSON string of PlaceInput object"),
-						watched: z
-							.string()
+							location_hint: z
+								.string()
+								.optional()
+								.describe("JSON string of LocationHint object"),
+							place: z
+								.string()
+								.optional()
+								.describe("JSON string of PlaceInput object"),
+							watched: z
+								.string()
 								.optional()
 								.describe("JSON string of WatchedInput object"),
 						}),
@@ -144,25 +128,20 @@ export class AdminCreateChatterEndpoint extends OpenAPIRoute {
 					} catch (e) {
 						console.error("Failed to parse created_at:", rawBody.created_at);
 					}
-				}
+
 				// Validate with Zod schema manually (instead of getValidatedData to avoid double-read)
-
-				try {
-						request = CreateChatterRequestSchema.parse(rawBody);
+					request = CreateChatterRequestSchema.parse(rawBody);
 				} catch (validationError) {
-						console.error("Validation failed:", validationError);
-						if (validationError instanceof z.ZodError) {
-							console.error("Zod errors:", JSON.stringify(validationError.errors));
-						}
-						throw validationError;
+					console.error("Validation failed:", validationError);
+					if (validationError instanceof z.ZodError) {
+						console.error("Zod errors:", JSON.stringify(validationError.errors));
+					}
+					throw validationError;
 				}
 
-		}
 			// Create enriched chatter with environment data
-			const chatter = await createChatter(request, c.env);
 
-			// Store to R2
-			await storeChatter(chatter, c.env);
+			const result = await storeChatter(chatter, c.env);
 
 			return c.json(chatter, 201);
 		} catch (error) {

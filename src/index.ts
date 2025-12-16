@@ -1,6 +1,8 @@
 import { fromHono } from "chanfana";
 import { Hono } from "hono";
 import { runWeeklyMaintenance } from "./cron/weekly-maintenance";
+import { runBookmarkSync } from "./cron/bookmark-sync";
+import { handleBookmarkQueue } from "./queue/bookmark-queue";
 import { AdminCreateChatterEndpoint } from "./endpoints/admin-create-chatter";
 import { AdminDeleteImage } from "./endpoints/admin-delete-image";
 import { AdminGeocodeReverseEndpoint } from "./endpoints/admin-geocode";
@@ -78,7 +80,12 @@ app.get("/app", handlePwaShell);
 export default {
 	fetch: app.fetch,
 	scheduled: async (event: ScheduledEvent, env: Env, ctx: ExecutionContext) => {
-		// Run weekly maintenance on cron trigger
+		// Run weekly maintenance and bookmark sync on cron trigger
 		ctx.waitUntil(runWeeklyMaintenance(env));
+		ctx.waitUntil(runBookmarkSync(env, ctx));
+	},
+	queue: async (batch: MessageBatch, env: Env, ctx: ExecutionContext) => {
+		// Handle bookmark sync queue
+		await handleBookmarkQueue(batch, env, ctx);
 	},
 };

@@ -170,7 +170,10 @@ async function enrichImageWithEnvironment(
 		enrichmentPromises.push(
 			fetchWeather(lat, lng, datetime, env)
 				.then((weather) => {
-					metadata.weather = weather;
+					// Only assign weather if not null (null = future date or invalid)
+					if (weather) {
+						metadata.weather = weather;
+					}
 				})
 				.catch(() => {})
 		);
