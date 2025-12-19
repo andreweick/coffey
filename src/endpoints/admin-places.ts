@@ -29,13 +29,17 @@ export class AdminNearbyPlacesEndpoint extends OpenAPIRoute {
 
 	async handle(c: Context<{ Bindings: Env }>) {
 		const data = await this.getValidatedData<typeof this.schema>();
-		const { lat, lng, q, radius } = data.query;
+		const { lat, lng, q, radius, types } = data.query;
+
+		// Parse comma-separated types into array
+		const typesArray = types ? types.split(',').map(t => t.trim()).filter(Boolean) : undefined;
 
 		const results = await fetchNearbyPlaces(c.env, {
 			lat,
 			lng,
 			query: q,
 			radius,
+			types: typesArray,
 		});
 
 		return c.json({ results });

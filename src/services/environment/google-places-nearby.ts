@@ -61,7 +61,7 @@ function calculateDistance(
  * @param lng - Longitude of the search center
  * @param env - Environment bindings
  * @param radius - Search radius in meters (default: 300)
- * @returns Up to 20 nearby places sorted by distance
+ * @returns Up to 20 nearby places sorted by popularity
  */
 export async function fetchNearbyPlaces(
 	lat: number,
@@ -96,7 +96,7 @@ export async function fetchNearbyPlaces(
 			},
 			includedTypes: POI_TYPES,
 			maxResultCount: 20,
-			rankPreference: "DISTANCE",
+			rankPreference: "POPULARITY",
 		}),
 	});
 

@@ -23,18 +23,20 @@ export interface FetchNearbyPlacesParams {
 	lng: number;
 	query?: string;
 	radius?: number;
+	types?: string[];
 }
 
 export async function fetchNearbyPlaces(
 	env: Env,
 	params: FetchNearbyPlacesParams
 ): Promise<NearbyPlace[]> {
-	const { lat, lng, query, radius = 1500 } = params;
+	const { lat, lng, query, radius = 500, types } = params;
 
 	// Round coordinates to 4 decimal places (~11m precision) for cache key
 	const roundedLat = Math.round(lat * 10000) / 10000;
 	const roundedLng = Math.round(lng * 10000) / 10000;
-	const cacheKey = `https://cache.internal/places-nearby:${roundedLat},${roundedLng}:${radius}:${query || 'all'}`;
+	const typesKey = types?.length ? types.sort().join(',') : 'all';
+	const cacheKey = `https://cache.internal/places-nearby:${roundedLat},${roundedLng}:${radius}:${query || 'noquery'}:${typesKey}`;
 
 	// Try to get from cache first
 	const cache = caches.default;
@@ -63,7 +65,14 @@ export async function fetchNearbyPlaces(
 				radius: radius,
 			},
 		},
+		maxResultCount: 20,
+		rankPreference: "POPULARITY",
 	};
+
+	// If specific types provided, filter to only those types
+	if (types && types.length > 0) {
+		requestBody.includedTypes = types;
+	}
 
 	// If query is provided, use it as a text query
 	if (query) {

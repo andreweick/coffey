@@ -2,6 +2,53 @@ import { Num, Str } from "chanfana";
 import { z } from "zod";
 
 /**
+ * Valid place types for filtering nearby search
+ * https://developers.google.com/maps/documentation/places/web-service/place-types
+ */
+export const PLACE_TYPES = [
+	"restaurant",
+	"cafe",
+	"bar",
+	"coffee_shop",
+	"bakery",
+	"food",
+	"meal_delivery",
+	"meal_takeaway",
+	"store",
+	"shopping_mall",
+	"supermarket",
+	"convenience_store",
+	"clothing_store",
+	"book_store",
+	"museum",
+	"art_gallery",
+	"tourist_attraction",
+	"park",
+	"gym",
+	"spa",
+	"beauty_salon",
+	"hair_care",
+	"library",
+	"movie_theater",
+	"night_club",
+	"stadium",
+	"church",
+	"hindu_temple",
+	"mosque",
+	"synagogue",
+	"hotel",
+	"lodging",
+	"airport",
+	"train_station",
+	"bus_station",
+	"subway_station",
+	"hospital",
+	"pharmacy",
+	"doctor",
+	"dentist",
+] as const;
+
+/**
  * Query parameters for nearby places search
  */
 export const NearbyPlacesQuerySchema = z.object({
@@ -11,7 +58,11 @@ export const NearbyPlacesQuerySchema = z.object({
 	radius: Num({
 		description: "Search radius in meters",
 		required: false,
-		default: 1500,
+		default: 500,
+	}),
+	types: Str({
+		description: "Comma-separated place types to filter (e.g., 'restaurant,cafe'). See Google Places API types.",
+		required: false,
 	}),
 });
 
