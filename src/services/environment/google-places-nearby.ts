@@ -60,14 +60,14 @@ function calculateDistance(
  * @param lat - Latitude of the search center
  * @param lng - Longitude of the search center
  * @param env - Environment bindings
- * @param radius - Search radius in meters (default: 500)
- * @returns Up to 5 nearby places with standard details
+ * @param radius - Search radius in meters (default: 300)
+ * @returns Up to 20 nearby places sorted by distance
  */
 export async function fetchNearbyPlaces(
 	lat: number,
 	lng: number,
 	env: Env,
-	radius: number = 500
+	radius: number = 300
 ): Promise<ApiSnapshot_NearbyPlaces> {
 	const apiKey = await env.GOOGLE_PLACES_API.get();
 	if (!apiKey) {
@@ -95,7 +95,8 @@ export async function fetchNearbyPlaces(
 				},
 			},
 			includedTypes: POI_TYPES,
-			maxResultCount: 10,
+			maxResultCount: 20,
+			rankPreference: "DISTANCE",
 		}),
 	});
 
