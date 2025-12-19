@@ -8,6 +8,7 @@ import { AdminDeleteImage } from "./endpoints/admin-delete-image";
 import { AdminGeocodeReverseEndpoint } from "./endpoints/admin-geocode";
 import { AdminListImages } from "./endpoints/admin-list-images";
 import { AdminNearbyPlacesEndpoint } from "./endpoints/admin-places";
+import { PLACE_TYPES } from "./schemas/places-schemas";
 import { AdminReindexEndpoint } from "./endpoints/admin-reindex";
 import { AdminUploadImage } from "./endpoints/admin-upload-image";
 import { ServeImage } from "./endpoints/serve-image";
@@ -57,6 +58,11 @@ app.use("/api/admin/*", requireAdmin);
 api.post("/api/admin/chatter", AdminCreateChatterEndpoint);
 api.get("/api/admin/geocode/reverse", AdminGeocodeReverseEndpoint);
 api.get("/api/admin/places/nearby", AdminNearbyPlacesEndpoint);
+
+// Simple endpoint to list available place types for dropdown
+app.get("/api/admin/places/types", (c) => {
+	return c.json({ types: PLACE_TYPES });
+});
 api.post("/api/admin/reindex", AdminReindexEndpoint);
 
 // Register image endpoints
