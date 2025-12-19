@@ -411,7 +411,775 @@ Configure in `wrangler.toml`:
 ## Technologies
 
 - **Runtime**: Cloudflare Workers
-- **Storage**: Cloudflare R2
-- **Framework**: Hono + Chanfana (OpenAPI)
-- **Validation**: Zod
-- **Metadata**: exifr (image EXIF/IPTC/ICC)
+- **Storage**: Cloudflare R2 (object storage) + D1 (SQL database)
+- **Framework**: Hono 4.6.20 + Chanfana 2.6.3 (OpenAPI)
+- **Validation**: Zod 3.24.1
+- **Authentication**: Cloudflare Access (JWT + OAuth)
+- **Metadata**: exifr 7.1.3 (image EXIF/IPTC/ICC)
+- **JWT Signing**: jose 6.1.3
+
+---
+
+## Code Structure & File Breakdown
+
+This section provides a detailed analysis of every source file, explaining what each does and how it works.
+
+### Directory Overview
+
+```
+src/
+├── index.ts              # Application entry point
+├── endpoints/            # OpenAPI route handlers (API endpoints)
+├── pages/                # HTML page handlers (web UI)
+├── services/             # Business logic & external integrations
+│   ├── environment/      # Environmental data APIs (weather, air quality, etc.)
+│   ├── raindrop/         # Raindrop.io bookmark integration
+│   └── tmdb/             # Movie/TV database integration
+├── schemas/              # Zod validation schemas
+├── types/                # TypeScript type definitions
+├── middleware/           # HTTP middleware (authentication)
+├── cron/                 # Scheduled task handlers
+├── queue/                # Message queue handlers
+├── lib/                  # Utility libraries
+└── ui/                   # HTML UI components
+```
+
+---
+
+### Core Application Files
+
+#### `src/index.ts` - Application Entry Point
+
+**What it does:** Bootstraps the entire Cloudflare Worker application, registers all routes, and exports the fetch/scheduled/queue handlers.
+
+**How it works:**
+1. Creates a Hono app instance with environment bindings
+2. Wraps Hono with Chanfana to add OpenAPI documentation support
+3. Configures documentation endpoints (`/api/docs`, `/openapi.json`, `/redocs`)
+4. Applies authentication middleware to `/admin/*` and `/api/admin/*` routes
+5. Registers all API endpoints (chatter, images, geocoding, places)
+6. Registers HTML page routes (home, about, admin forms)
+7. Exports three handlers:
+   - `fetch` - HTTP request handler (main API)
+   - `scheduled` - Cron trigger handler (runs maintenance and bookmark sync)
+   - `queue` - Message queue handler (processes bookmark messages)
+
+```typescript
+// Key pattern: Route registration
+api.post("/api/admin/chatter", AdminCreateChatterEndpoint);
+app.use("/admin/*", requireAdmin);  // Middleware applied to route group
+```
+
+---
+
+### Endpoints (`src/endpoints/`)
+
+Each endpoint is a class extending `OpenAPIRoute` from Chanfana, providing automatic schema validation and documentation.
+
+#### `admin-create-chatter.ts` - Create Chatter Endpoint
+
+**What it does:** Creates location-enriched chatter posts with environmental data, images, and link previews.
+
+**How it works:**
+1. Accepts both JSON and multipart/form-data (for direct image uploads)
+2. Parses request based on content-type header
+3. Transforms flat fields (`lat`, `lng`, `placeId`) to nested format for Apple Shortcuts compatibility
+4. Handles mixed images: uploads new files to Cloudflare Images, keeps existing URL references
+5. Validates request with Zod schema (`CreateChatterRequestSchema`)
+6. Calls `createChatter()` service to enrich with environmental data
+7. Stores final chatter JSON to R2 via `storeChatter()`
+
+**Key patterns:**
+- Flexible input normalization (single URL → array → objects)
+- Tags as repeated form fields (`-F "tags=a" -F "tags=b"`)
+- JSON strings for complex objects in multipart (`-F 'location_hint={"lat":X,"lng":Y}'`)
+
+#### `admin-upload-image.ts` - Image Upload Endpoint
+
+**What it does:** Uploads images with automatic metadata extraction and deduplication.
+
+**How it works:**
+1. Accepts multipart/form-data with image file
+2. Validates MIME type (jpeg, png, gif, webp)
+3. Computes SHA-256 hash for content-addressing
+4. Checks D1 database for existing image with same hash (deduplication)
+5. Extracts EXIF/IPTC/ICC metadata using exifr library
+6. Enriches with environmental data if GPS coordinates present
+7. Uploads to Cloudflare Hosted Images API
+8. Stores metadata JSON to R2 and record to D1
+
+**Returns:** Object key (`images/sha_{hash}`), UUID, metadata, upload timestamp
+
+#### `admin-list-images.ts` - List Images Endpoint
+
+**What it does:** Paginated listing and search of uploaded images.
+
+**How it works:**
+1. Queries D1 `images` table with pagination (limit/offset)
+2. Supports filtering by filename or date range
+3. Joins with R2 metadata for full image details
+4. Returns array of image objects with metadata
+
+#### `admin-delete-image.ts` - Delete Image Endpoint
+
+**What it does:** Soft-deletes images by setting `deleted_at` timestamp.
+
+**How it works:**
+1. Parses filename from URL path (`:filename` parameter)
+2. Updates D1 record to set `deleted_at = NOW()`
+3. Does NOT delete from R2 or Cloudflare Images (preserves data for recovery)
+
+#### `admin-geocode.ts` - Reverse Geocoding Endpoint
+
+**What it does:** Converts GPS coordinates to human-readable addresses.
+
+**How it works:**
+1. Accepts `lat` and `lng` query parameters
+2. Calls Google Places API for reverse geocoding
+3. Returns structured address (city, state, country, formatted address)
+
+#### `admin-places.ts` - Nearby Places Endpoint
+
+**What it does:** Searches for points of interest near GPS coordinates.
+
+**How it works:**
+1. Accepts `lat`, `lng`, and optional `radius` parameters
+2. Calls Google Places Nearby Search API
+3. Returns up to 10 places with name, address, distance, and maps URL
+4. Caches results for 72 hours (configurable via `PLACES_CACHE_HOURS`)
+
+#### `admin-reindex.ts` - Reindex Endpoint
+
+**What it does:** Rebuilds search indexes and compacts JSONL files.
+
+**How it works:**
+1. Lists all chatter JSON files from R2 (`chatter/json/` prefix)
+2. Rebuilds index files for fast lookup
+3. Compacts JSONL files for efficient storage
+
+#### `serve-image.ts` - Public Image Serving Endpoint
+
+**What it does:** Serves transformed images with different presets (social media, content, full).
+
+**How it works:**
+1. Parses hash and preset from URL (`/images/:hash/:preset`)
+2. Validates preset (chatter, content, public)
+3. Looks up image in R2 by prefix (`images/sha_{hash}.`)
+4. Uses Cloudflare's `cf.image` transformation option:
+   - `chatter`: 1200x630 cover crop (social media cards)
+   - `content`: 1200px max-width (blog posts)
+   - `public`: Full resolution, metadata stripped
+5. Returns transformed image with 1-year cache headers
+
+**Key pattern (two-endpoint workaround):**
+```typescript
+// Main endpoint validates and applies cf.image transformation
+// Uses internal fetch to raw image endpoint
+const response = await fetch(internalUrl, { cf: { image: transformation } });
+```
+
+---
+
+### Pages (`src/pages/`)
+
+HTML page handlers that return server-rendered web UI using WebAwesome components.
+
+#### `home.ts` - Homepage Handler
+
+**What it does:** Renders the main landing page.
+
+**How it works:**
+1. Returns HTML wrapped in `layout()` component
+2. Displays recent chatters or welcome message
+3. Uses WebAwesome CSS framework for styling
+
+#### `about.ts` - About Page Handler
+
+**What it does:** Renders static about/information page.
+
+#### `admin-chatter-new.ts` - Chatter Creation Form
+
+**What it does:** Renders the admin form for creating new chatters.
+
+**How it works:**
+1. Accepts URL query parameters for prepopulation (`?title=X&url=Y`)
+2. Renders form with fields for content, title, tags, images, links
+3. Includes JavaScript for:
+   - GPS location capture via Geolocation API
+   - Nearby places search and selection
+   - Image upload with preview
+   - Link URL input with preview fetching
+4. Submits to `/api/admin/chatter` via POST
+
+#### `admin-image-new.ts` - Image Upload Form
+
+**What it does:** Renders the admin form for uploading images.
+
+**How it works:**
+1. Renders file input for image selection
+2. Shows upload progress and extracted metadata
+3. Submits to `/api/admin/images` via POST
+
+#### `pwa-shell.ts` - Progressive Web App Shell
+
+**What it does:** Provides PWA manifest and shell for mobile app experience.
+
+---
+
+### Services (`src/services/`)
+
+Business logic layer handling data processing and external API integrations.
+
+#### `chatter-service.ts` - Chatter Creation Service
+
+**What it does:** Creates, enriches, and stores chatter posts.
+
+**How it works:**
+
+1. **`canonicalJSON(obj)`** - Serializes objects with stable key ordering for consistent hashing
+   ```typescript
+   const keys = Object.keys(obj).sort();
+   const pairs = keys.map(key => `"${key}":${canonicalJSON(obj[key])}`);
+   return "{" + pairs.join(",") + "}";
+   ```
+
+2. **`hashJSON(data)`** - Computes SHA-256 hash of canonical JSON
+   ```typescript
+   const buffer = encoder.encode(canonicalJSON(data));
+   const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+   ```
+
+3. **`createChatter(request, env)`** - Main creation function
+   - Calls `enrichChatter()` for environmental data
+   - Computes content hash for ID (`sha256:{hash}`)
+   - Uses provided `created_at` or generates current timestamp
+   - Returns complete Chatter object with envelope
+
+4. **`storeChatter(chatter, env)`** - Stores to R2
+   - Extracts date from `created_at` for file organization
+   - Builds object key: `chatter/json/YYYY-MM-DD-sha_{hash}.json`
+   - Uploads JSON with content-type header
+
+#### `image-upload.ts` - Image Upload Service
+
+**What it does:** Handles complete image upload workflow with metadata extraction and deduplication.
+
+**How it works:**
+
+1. **`hashFile(file)`** - Computes SHA-256 of file content
+2. **`checkForDuplicateImage(hash, env)`** - Queries D1 for existing hash
+3. **`extractMetadata(file)`** - Parses EXIF/IPTC/ICC using exifr
+4. **`enrichImageWithEnvironment(metadata, env)`** - Adds weather, elevation, geocoding if GPS present
+5. **`uploadToCloudflareImages(file, env, metadata)`** - Uploads to Cloudflare Images API
+6. **`saveImageRecord(...)`** - Stores to both R2 (JSON) and D1 (record)
+
+**Key pattern - SHA-256 content addressing:**
+```typescript
+const hash = await hashFile(file);
+const objectKey = `images/sha_${hash}`;  // Duplicate uploads return same key
+```
+
+#### `link-preview.ts` - Link Metadata Fetching
+
+**What it does:** Fetches OpenGraph metadata from URLs for link previews.
+
+**How it works:**
+
+1. **`extractDomain(url)`** - Parses hostname from URL
+2. **`parseMetaTags(html)`** - Regex extraction of:
+   - `og:title`, `og:description`, `og:image` (OpenGraph)
+   - `<meta name="description">` (fallback)
+   - `<title>` tag (fallback)
+3. **`fetchLinkMetadata(url)`** - Main fetch function
+   - 10-second timeout via AbortController
+   - User-Agent: "CoffeyBot/1.0"
+   - Only parses first 100KB (enough for meta tags)
+4. **`enrichLinks(links)`** - Parallel fetch for array of links
+   - Preserves existing metadata if present
+   - Uses Promise.all for concurrent fetching
+
+#### `metadata-extractor.ts` - Image Metadata Extraction
+
+**What it does:** Extracts EXIF, IPTC, and ICC metadata from images.
+
+**How it works:**
+1. Uses exifr library to parse image buffer
+2. Extracts camera info (make, model, lens)
+3. Extracts shooting settings (ISO, aperture, exposure, focal length)
+4. Extracts GPS coordinates if present
+5. Extracts IPTC keywords, caption, copyright
+6. Extracts ICC color profile
+
+#### `geocode.ts` - Geocoding Service
+
+**What it does:** Reverse geocoding wrapper for Google Places API.
+
+#### `places.ts` - Places Search Service
+
+**What it does:** Nearby places search wrapper with caching.
+
+#### `admin.ts` - Admin Utilities
+
+**What it does:** Administrative functions like reindexing and compaction.
+
+---
+
+### Environment Services (`src/services/environment/`)
+
+These services fetch environmental data from various Google APIs and cache results.
+
+#### `enrichment.ts` - Environment Enrichment Orchestrator
+
+**What it does:** Coordinates parallel fetching of all environmental data.
+
+**How it works:**
+1. Extracts coordinates from `location_hint` or `place`
+2. If Place ID provided without name, fetches place details first
+3. Fetches all environmental data in parallel using `Promise.allSettled`:
+   ```typescript
+   const [weather, airQuality, pollen, elevation, geocoding, nearbyPlaces] =
+     await Promise.allSettled([
+       fetchWeather(lat, lng, datetime, env),
+       fetchAirQuality(lat, lng, env),
+       fetchPollen(lat, lng, env),
+       fetchElevation(lat, lng, env),
+       reverseGeocodeFull(lat, lng, env),
+       fetchNearbyPlaces(lat, lng, env, 500),
+     ]);
+   ```
+4. Uses `assignIfFulfilled()` helper to handle partial failures gracefully
+5. Enriches links with OpenGraph metadata
+6. Fetches TMDB data if `watched` field provided
+
+**Key pattern - Graceful degradation:**
+```typescript
+// Individual API failures don't block the whole request
+if (result.status === "fulfilled" && result.value !== null) {
+  environment[key] = result.value;
+} else {
+  console.error(errorMessage, result.reason);  // Log but continue
+}
+```
+
+#### `weather-unified.ts` - Unified Weather Routing
+
+**What it does:** Routes weather requests to appropriate API based on date.
+
+**How it works:**
+1. Calculates time difference from target datetime
+2. If within last 24 hours → Google Weather hourly history
+3. If older → Open-Meteo historical data
+4. If future → Returns null (no weather data for future)
+
+#### `google-weather.ts` - Google Weather API
+
+**What it does:** Fetches current weather conditions.
+
+**API:** `https://weather.googleapis.com/v1/currentConditions:lookup`
+
+#### `google-weather-hourly.ts` - Google Hourly Weather
+
+**What it does:** Fetches hourly weather history (last 24 hours).
+
+**API:** `https://weather.googleapis.com/v1/history:lookup`
+
+#### `openmeteo-historical.ts` - Open-Meteo Historical Weather
+
+**What it does:** Fetches historical weather for dates >24 hours ago.
+
+**API:** `https://archive-api.open-meteo.com/v1/archive`
+
+#### `google-air-quality.ts` - Air Quality API
+
+**What it does:** Fetches current air quality index.
+
+**API:** `https://airquality.googleapis.com/v1/currentConditions:lookup`
+
+#### `google-pollen.ts` - Pollen Forecast API
+
+**What it does:** Fetches pollen forecast data.
+
+**API:** `https://pollen.googleapis.com/v1/forecast:lookup`
+
+#### `google-elevation.ts` - Elevation API
+
+**What it does:** Fetches elevation from coordinates.
+
+**API:** `https://maps.googleapis.com/maps/api/elevation/json`
+
+#### `google-places.ts` - Place Details API
+
+**What it does:** Fetches full place details and reverse geocoding.
+
+**API:** `https://places.googleapis.com/v1/places/{placeId}`
+
+#### `google-places-nearby.ts` - Nearby Places Search
+
+**What it does:** Searches for POIs within radius with caching.
+
+**How it works:**
+1. Checks cache (KV) for existing results within cache period
+2. If cache miss, calls Google Places Nearby Search API
+3. Filters and formats results (name, address, distance, maps URL)
+4. Stores in cache with 72-hour TTL
+
+**API:** `https://places.googleapis.com/v1/places:searchNearby`
+
+#### `google-places-utils.ts` - Place Utilities
+
+**What it does:** Helper functions for place data formatting.
+
+---
+
+### Raindrop Integration (`src/services/raindrop/`)
+
+Integration with Raindrop.io for bookmark synchronization.
+
+#### `api-client.ts` - Raindrop API Client
+
+**What it does:** Fetches bookmarks from Raindrop.io API.
+
+**How it works:**
+1. Authenticates with Raindrop API token
+2. Fetches recent bookmarks (newest 50)
+3. Returns raw bookmark data
+
+#### `bookmark-processor.ts` - Bookmark Processor
+
+**What it does:** Converts Raindrop bookmarks to internal format.
+
+**How it works:**
+1. Transforms Raindrop JSON to internal bookmark schema
+2. Extracts tags, collection, cover image
+3. Computes SHA-256 hash for content-addressing
+
+#### `artifact-downloader.ts` - Artifact Downloader
+
+**What it does:** Downloads and stores Raindrop archive artifacts.
+
+**How it works:**
+1. Fetches HTML cache from Raindrop
+2. Stores to R2 for offline access
+
+---
+
+### TMDB Integration (`src/services/tmdb/`)
+
+#### `tmdb-api.ts` - The Movie Database API
+
+**What it does:** Searches and fetches movie/TV show details.
+
+**How it works:**
+1. **`searchMovie(title, env)`** - Search movies by title
+2. **`searchTv(title, env)`** - Search TV shows by title
+3. **`fetchMovieDetails(id, env)`** - Get full movie details
+4. **`fetchTvDetails(id, env)`** - Get full TV show details
+
+**API:** `https://api.themoviedb.org/3/`
+
+---
+
+### Schemas (`src/schemas/`)
+
+Zod validation schemas for request/response validation.
+
+#### `chatter-schemas.ts` - Chatter Schemas
+
+**What it does:** Defines validation for chatter creation and response.
+
+**Key schemas:**
+- `CreateChatterRequestSchema` - Input validation with flexible formats
+- `ChatterSchema` - Full chatter envelope structure
+- `ChatterDataSchema` - Inner data structure
+- `LinkInputSchema` - Flexible link format (string, array, or objects)
+- `LocationHintSchema` - GPS coordinates with optional accuracy
+- `PlaceInputSchema` - Place selection with provider IDs
+
+**Key pattern - Flexible input normalization:**
+```typescript
+// Accepts: "url", ["url1", "url2"], or [{url: "..."}]
+const LinksInput = z.union([
+  z.string().transform(url => [{ url }]),
+  z.array(z.string()).transform(urls => urls.map(url => ({ url }))),
+  z.array(LinkObjectSchema),
+]);
+```
+
+#### `image-schemas.ts` - Image Schemas
+
+**What it does:** Defines image metadata and upload response schemas.
+
+#### `bookmark-schemas.ts` - Bookmark Schemas
+
+**What it does:** Defines Raindrop bookmark schemas.
+
+#### `common.ts` - Common Response Schemas
+
+**What it does:** Shared response patterns (error, pagination).
+
+**Exports:**
+- `standardErrorResponses` - 401, 403, 500 response definitions
+- `responses.badRequest(msg)` - 400 error factory
+- `ErrorResponseSchema` - Error object structure
+
+#### `geocode-schemas.ts` - Geocoding Schemas
+
+**What it does:** Defines reverse geocoding request/response.
+
+#### `places-schemas.ts` - Places Schemas
+
+**What it does:** Defines nearby places request/response.
+
+---
+
+### Types (`src/types/`)
+
+TypeScript type definitions, often inferred from Zod schemas.
+
+#### `chatter.ts` - Chatter Types
+
+**What it does:** Exports chatter-related types.
+
+```typescript
+export type Chatter = z.infer<typeof ChatterSchema>;
+export type ChatterData = z.infer<typeof ChatterDataSchema>;
+export type CreateChatterRequest = z.infer<typeof CreateChatterRequestSchema>;
+```
+
+#### `image.ts` - Image Types
+
+**What it does:** Exports image metadata and upload types.
+
+#### `bookmark.ts` - Bookmark Types
+
+**What it does:** Exports bookmark and Raindrop types.
+
+#### `domain.ts` - Domain Types
+
+**What it does:** Core domain types (Post, PostSummary, NearbyPlace).
+
+---
+
+### Middleware (`src/middleware/`)
+
+#### `access.ts` - Cloudflare Access Authentication
+
+**What it does:** Validates authentication for admin routes.
+
+**How it works:**
+1. **Development bypass** - Localhost, 127.0.0.1, dev.eick.com skip auth
+2. **JWT validation** - Parses `Cf-Access-Jwt-Assertion` header
+   - Fetches public keys from `{TEAM_DOMAIN}/cdn-cgi/access/certs`
+   - Verifies signature and audience claim
+   - Extracts email (user auth) or common_name (service token)
+3. **Legacy fallback** - Checks `Cf-Access-Authenticated-User-Email` header
+4. **Optional allowlist** - Checks email against `ADMIN_EMAILS` if configured
+
+**Key pattern - Dual auth support:**
+```typescript
+if (payload.email) {
+  return { type: "user", email: payload.email };
+} else if (payload.common_name) {
+  return { type: "service_token", clientId: payload.common_name };
+}
+```
+
+---
+
+### Cron Jobs (`src/cron/`)
+
+Scheduled tasks that run on Cloudflare's cron triggers.
+
+#### `weekly-maintenance.ts` - Maintenance Cron
+
+**What it does:** Runs periodic maintenance tasks.
+
+**How it works:**
+1. Triggered every 30 minutes (configurable in wrangler.jsonc)
+2. Checks `CRON_ENABLE` flag before running
+3. Calls reindex and JSONL compaction functions
+
+#### `bookmark-sync.ts` - Bookmark Sync Cron
+
+**What it does:** Syncs bookmarks from Raindrop.io.
+
+**How it works:**
+1. Fetches newest 50 bookmarks from Raindrop API
+2. Checks D1 for existing records
+3. Creates KV work entry for new bookmarks
+4. Enqueues message with random 1-11 hour delay (load spreading)
+
+---
+
+### Queue Handlers (`src/queue/`)
+
+#### `bookmark-queue.ts` - Bookmark Queue Consumer
+
+**What it does:** Processes bookmark sync messages from queue.
+
+**How it works:**
+1. Receives batch of messages from Cloudflare Queue
+2. For each message:
+   - Fetches full bookmark details from Raindrop
+   - Computes SHA-256 hash
+   - Stores to R2 (JSON) and D1 (record)
+   - Downloads artifact if available
+3. Acknowledges processed messages
+
+---
+
+### Utility Libraries (`src/lib/`)
+
+#### `errors.ts` - Error Handling Utilities
+
+**What it does:** Error formatting and extraction.
+
+**Key functions:**
+- `getErrorMessage(error)` - Safely extracts error message from any type
+- `errorResponse(message, error)` - Formats error for JSON response
+
+#### `duration.ts` - Duration Parsing
+
+**What it does:** Parses human-readable duration strings.
+
+---
+
+### UI Components (`src/ui/`)
+
+Server-side HTML rendering using WebAwesome CSS framework.
+
+#### `layout.ts` - Page Layout Wrapper
+
+**What it does:** Provides consistent HTML structure for all pages.
+
+**How it works:**
+1. Renders HTML5 doctype and head (meta, stylesheets)
+2. Includes WebAwesome CSS and icons
+3. Wraps content in responsive layout
+4. Adds header navigation and footer
+
+#### `components.ts` - Reusable UI Components
+
+**What it does:** Shared UI elements (navigation, footer, forms).
+
+---
+
+### Database Migrations (`migrations/`)
+
+D1 SQL migrations for schema evolution.
+
+#### `0001_create_images_table.sql`
+
+Creates the `images` table:
+```sql
+CREATE TABLE images (
+  sha256 TEXT PRIMARY KEY,      -- Content-addressed hash
+  uuid TEXT,                    -- Cloudflare Images UUID
+  original_filename TEXT,
+  date_taken TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT               -- Soft delete flag
+);
+```
+
+#### `0002_create_bookmark_table.sql`
+
+Creates the `bookmark` table for Raindrop sync:
+```sql
+CREATE TABLE bookmark (
+  uuid INTEGER PRIMARY KEY,     -- Raindrop ID
+  sha256 TEXT,
+  link TEXT,
+  title TEXT,
+  excerpt TEXT,
+  domain TEXT,
+  type TEXT,
+  cover_image_id TEXT,
+  collection_id INTEGER,
+  collection_title TEXT,
+  tags TEXT,                    -- JSON array
+  created_at TEXT,
+  updated_at TEXT,
+  synced_at TEXT,
+  deleted_at TEXT
+);
+```
+
+#### `0003_update_bookmark_cover.sql`
+
+Schema updates for bookmark cover images.
+
+---
+
+### Configuration Files
+
+#### `wrangler.jsonc` - Cloudflare Workers Configuration
+
+**What it does:** Defines Worker settings, bindings, and environments.
+
+**Key bindings:**
+- `COFFEY_BUCKET` (R2) - Object storage for chatters, images, bookmarks
+- `COFFEY_DB` (D1) - SQL database for structured queries
+- `COFFEY_KV` (KV) - Key-value store for caching and work queues
+- Secrets: API tokens for Google, Cloudflare, Raindrop
+
+**Environments:**
+- `dev` - Local development (dev.eick.com)
+- `production` - Production deployment (eick.com)
+
+#### `worker-configuration.d.ts` - Environment Type Definitions
+
+**What it does:** TypeScript declarations for Cloudflare bindings.
+
+```typescript
+interface Env {
+  COFFEY_BUCKET: R2Bucket;
+  COFFEY_DB: D1Database;
+  COFFEY_KV: KVNamespace;
+  // ... secrets and variables
+}
+```
+
+---
+
+## Architecture Patterns
+
+### 1. Content-Addressable Storage (SHA-256)
+
+All content uses SHA-256 hashes for IDs:
+- **Chatters:** `sha256:{64-char-hex}`
+- **Images:** `images/sha_{hash}.{ext}`
+- **Benefits:** Automatic deduplication, immutable URLs, cache-friendly
+
+### 2. Parallel Environmental Enrichment
+
+Uses `Promise.allSettled()` for resilient parallel fetching:
+```typescript
+const results = await Promise.allSettled([
+  fetchWeather(...),
+  fetchAirQuality(...),
+  // ...
+]);
+// Individual failures don't block the request
+```
+
+### 3. Flexible Input Normalization
+
+APIs accept multiple input formats and normalize internally:
+- Links: `"url"` → `["url"]` → `[{url: "url"}]`
+- Location: `lat=X&lng=Y` → `{location_hint: {lat: X, lng: Y}}`
+
+### 4. Two-Endpoint Image Pattern
+
+Works around Cloudflare Images billing:
+1. Public endpoint validates and applies transformations
+2. Internal endpoint serves raw images
+3. Uses `cf.image` fetch option for transformations
+
+### 5. Soft Deletes
+
+Uses `deleted_at` column instead of hard deletes:
+- Preserves audit trail
+- Enables recovery
+- Filtered in queries: `WHERE deleted_at IS NULL`
