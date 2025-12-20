@@ -49,6 +49,11 @@ export const PLACE_TYPES = [
 ] as const;
 
 /**
+ * TypeScript type for valid place types
+ */
+export type PlaceType = typeof PLACE_TYPES[number];
+
+/**
  * Query parameters for nearby places search
  */
 export const NearbyPlacesQuerySchema = z.object({
@@ -85,6 +90,14 @@ export const NearbyPlacesResponseSchema = z.object({
 	results: z.array(NearbyPlaceSchema).describe("Array of nearby places"),
 });
 
+/**
+ * Response schema for place types list
+ */
+export const PlaceTypesResponseSchema = z.object({
+	types: z.array(z.string()).describe("Array of valid place type strings"),
+});
+
 export type NearbyPlacesQuery = z.infer<typeof NearbyPlacesQuerySchema>;
 export type NearbyPlace = z.infer<typeof NearbyPlaceSchema>;
 export type NearbyPlacesResponse = z.infer<typeof NearbyPlacesResponseSchema>;
+export type PlaceTypesResponse = z.infer<typeof PlaceTypesResponseSchema>;
