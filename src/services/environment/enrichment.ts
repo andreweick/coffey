@@ -131,7 +131,7 @@ export async function enrichChatter(
 			fetchPollen(coords.lat, coords.lng, env),
 			fetchElevation(coords.lat, coords.lng, env),
 			reverseGeocodeFull(coords.lat, coords.lng, env),
-			fetchNearbyPlaces(coords.lat, coords.lng, env, 500),
+			fetchNearbyPlaces(coords.lat, coords.lng, env),
 		]);
 
 	// Build environment object with successful results

@@ -196,7 +196,7 @@ async function enrichImageWithEnvironment(
 	);
 
 	enrichmentPromises.push(
-		fetchNearbyPlaces(lat, lng, env, 500)
+		fetchNearbyPlaces(lat, lng, env)
 			.then((nearbyPlaces) => {
 				metadata.nearby_places = nearbyPlaces;
 			})
